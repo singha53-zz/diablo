@@ -18,7 +18,7 @@ biblio-style: genome-biology.csl
 ## 1) [Multi-omics methods overview]()
 * Describe types of multi-omic methods (unsupervised and supervised methods and variable selection (yes/no))
   
-## 2) [Simulation Study]()
+## 2) [Simulation Study](https://github.com/singha53/diablo/blob/master/analyses/simulation_study/src/simulation_study.md)
 * how does DIABLO compares with existing integrative classification schemes (Concatenation and Ensemble)
 * effect of the design (connection between datasets) on the types of variables selected (correlated vs. discriminatory) and error rate
 
