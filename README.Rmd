@@ -1,0 +1,20 @@
+---
+title: "diablo"
+author: "Amrit Singh"
+date: "January 31, 2018"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Table of contents
+
+## 1) [Multi-omics methods overview]()
+## 2) [Simulation Study]()
+## 3) [Benchmarking]()
+## 4) [Case study 1: BRCA]()
+## 5) [Case study 2: Asthma]()
