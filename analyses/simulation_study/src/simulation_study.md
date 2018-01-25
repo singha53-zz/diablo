@@ -1,0 +1,72 @@
+---
+title: 'Simulation study'
+bibliography: /Users/asingh/Dropbox/Manuscript/diablo/mybib.bib
+thanks: "Replication files are available at https://github.com/singha53/diablo"
+output:
+  html_document:
+    theme: united
+    highlight: tango
+    keep_md: yes
+biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
+---
+
+
+
+## Objectives
+* how does DIABLO compares with existing integrative classification schemes (Concatenation and Ensemble)
+* effect of the design (connection between datasets) on the types of variables selected (correlated vs. discriminatory) and error rate
+
+\pagebreak
+
+## Generate different types of variables and apply diablo to each type separately
+* 3 datasets (effective sample size = 100; group1=100 observations, group2=100 observations)
+* each dataset has four types of variables; lets explore them now
+
+
+```r
+# simulate data with a Fold-change of 2 and noise of 0.5
+fc = 2
+noise = 0.5
+J = 3
+n = 25
+p_relevant = 10
+p_irrelevant = 50
+simdata <- simData(fc, noise, J, n, p_relevant, p_irrelevant)
+```
+
+## Correlated & Discriminatory (corDis) components
+
+
+```r
+pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
+```
+
+<img src="simulation_study_files/figure-html/unnamed-chunk-2-1.png" width="100%" />
+
+## Correlated & Non-Discriminatory (corNonDis) components
+
+
+```r
+pairPlot(mat = simdata$bComp_full_irrelevant, group = factor(simdata$Y))
+```
+
+<img src="simulation_study_files/figure-html/unnamed-chunk-3-1.png" width="100%" />
+
+## unCorrelated & Non-Discriminatory (unCorNonDis) components
+
+
+```r
+pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
+```
+
+<img src="simulation_study_files/figure-html/unnamed-chunk-4-1.png" width="100%" />
+
+## unCorrelated & Non-Discriminatory (unCorNonDis) components
+
+
+```r
+pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
+```
+
+<img src="simulation_study_files/figure-html/unnamed-chunk-5-1.png" width="100%" />
+
