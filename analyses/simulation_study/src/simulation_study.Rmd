@@ -19,6 +19,7 @@ WhereAmI <- "~/Dropbox/Manuscript/diablo/analyses/simulation_study/"
 ## load libraries
 library(cowplot)
 library(mixOmics)
+library(mvtnorm)
 library(NMF)
 
 ## source functions
@@ -179,7 +180,7 @@ for(z in 1 : nperms){
 
 ```
 
-## error rate
+## Error rates
 
 ```{r}
 errorRates <- do.call(rbind, errList_repeat)  %>% 

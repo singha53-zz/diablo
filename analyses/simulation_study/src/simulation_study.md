@@ -23,54 +23,79 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ## Generate different types of variables and apply diablo to each type separately
 * 3 datasets (effective sample size = 100; group1=100 observations, group2=100 observations)
 * each dataset has four types of variables; lets explore them now
+  + 30 variables that contribute to correlated & discriminatory components
+  + 30 variables that contribute to correlated & nondiscriminatory components
+  + 100 variables that contribute to uncorrelated & discriminatory components
+  + 100 variables that contribute to uncorrelated & nondiscriminatory components
+
+### Correlation structure for each set of simulated variables
+
+#### corDis
 
 
 ```r
-# simulate data with a Fold-change of 2 and noise of 0.5
-fc = 2
-noise = 0.5
 J = 3
-n = 25
-p_relevant = 10
-p_irrelevant = 50
-simdata <- simData(fc, noise, J, n, p_relevant, p_irrelevant)
+fc = 3
+n = 50
+Y <- factor(rep(c("group 1", "group 2"), each = n))
+## Generate variates that contribute to the full design
+rho = 0.8
+sigma = matrix(rho, J, J)
+diag(sigma) = 1
+## Variate for Group 1
+bComp1 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
+## Variate for Group 2
+bComp2 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
+bComp.full <- rbind(bComp1, bComp2)
+bComp_full_irrelevant <- as.data.frame(rmvnorm(2 * n, rep(0, J), sigma))
+colnames(bComp.full) <- colnames(bComp_full_irrelevant) <- paste("Dataset", 
+    1:J, sep = "_")
+
+pairPlot(bComp.full, group = Y)
 ```
 
-## Correlated & Discriminatory (corDis) components
+<img src="simulation_study_files/figure-html/unnamed-chunk-1-1.png" width="100%" />
+
+#### corNonDis
 
 
 ```r
-pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
+pairPlot(bComp_full_irrelevant, group = Y)
 ```
 
 <img src="simulation_study_files/figure-html/unnamed-chunk-2-1.png" width="100%" />
 
-## Correlated & Non-Discriminatory (corNonDis) components
+#### unCorDis
 
 
 ```r
-pairPlot(mat = simdata$bComp_full_irrelevant, group = factor(simdata$Y))
+## Generate variates that contribute to the null design
+rho = 0
+sigma = matrix(rho, J, J)
+diag(sigma) = 1
+# Variate for Group 1
+bComp1 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
+## Variate for Group 2
+bComp2 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
+bComp.null <- rbind(bComp1, bComp2)  #+ matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J)
+bComp_null_irrelevant <- as.data.frame(rmvnorm(2 * n, rep(0, J), sigma))
+colnames(bComp.null) <- colnames(bComp_null_irrelevant) <- paste("Dataset", 
+    1:J, sep = "_")
+
+pairPlot(bComp.null, group = Y)
 ```
 
 <img src="simulation_study_files/figure-html/unnamed-chunk-3-1.png" width="100%" />
 
-## unCorrelated & Non-Discriminatory (unCorNonDis) components
+#### unCorNonDis
 
 
 ```r
-pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
+pairPlot(bComp_null_irrelevant, group = Y)
 ```
 
 <img src="simulation_study_files/figure-html/unnamed-chunk-4-1.png" width="100%" />
 
-## unCorrelated & Non-Discriminatory (unCorNonDis) components
-
-
-```r
-pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
-```
-
-<img src="simulation_study_files/figure-html/unnamed-chunk-5-1.png" width="100%" />
 
 ## Simulation: vary noise and fold-change and compare with other schemes (concatenation/ensembles)
 * concatenation_splsda, ensemble_splsda, diabloFull, diabloNull
@@ -78,7 +103,7 @@ pairPlot(mat = simdata$bComp.full, group = factor(simdata$Y))
 
 ```r
 J <- 3
-fcSeq <- c(0.5, 1, 2, 4)
+fcSeq <- c(0.5, 1, 2, 3)
 noiseSeq <- c(0.2, 0.3, 0.4, 0.5)
 fc.noise.grid <- expand.grid(fcSeq, noiseSeq)
 colnames(fc.noise.grid) <- c("FC", "Noise")
@@ -178,35 +203,6 @@ for (z in 1:nperms) {
 }
 ```
 
-### Selected variables
-
-
-```r
-selectedVars <- do.call(rbind, varsList_repeat) %>% ungroup %>% mutate(Classifier = factor(Classifier, 
-    levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
-    group_by(Classifier, FC, Noise, varType) %>% summarise(Mean = mean(n), SD = sd(n)) %>% 
-    ggplot(aes(x = Classifier, y = Mean, color = varType, fill = varType)) + 
-    geom_bar(stat = "identity", position = "dodge") + geom_errorbar(aes(ymin = Mean, 
-    ymax = Mean + SD), position = "dodge") + facet_grid(FC ~ Noise) + customTheme(sizeStripFont = 15, 
-    xAngle = -45, hjust = 0, vjust = 1, xSize = 10, ySize = 10, xAxisSize = 10, 
-    yAxisSize = 10) + ylab("Mean±SD of the number of selected variables (50 simulations)") + 
-    geom_hline(yintercept = 90, linetype = "dashed") + xlab("Integrative Classifiers")
-selectedVars
-```
-
-<img src="simulation_study_files/figure-html/unnamed-chunk-7-1.png" width="100%" />
-
-```r
-pdf(paste0(WhereAmI, "results/selectedVariables.pdf"), width = 10, height = 10)
-selectedVars
-dev.off()
-```
-
-```
-## quartz_off_screen 
-##                 2
-```
-
 ## error rate
 
 
@@ -215,18 +211,40 @@ errorRates <- do.call(rbind, errList_repeat) %>% mutate(Classifier = factor(Clas
     levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
     group_by(Classifier, FC, Noise) %>% summarise(Mean = mean(error), SD = sd(error)) %>% 
     ggplot(aes(x = Classifier, y = Mean)) + geom_bar(stat = "identity") + geom_errorbar(aes(ymin = Mean - 
-    SD, ymax = Mean + SD)) + facet_grid(FC ~ Noise) + customTheme(sizeStripFont = 15, 
-    xAngle = -45, hjust = 0, vjust = 1, xSize = 10, ySize = 10, xAxisSize = 10, 
-    yAxisSize = 10) + ylab("Mean±SD of error rate (10-fold cross-validation over 50 simulations)") + 
+    SD, ymax = Mean + SD)) + facet_grid(FC ~ Noise) + customTheme(sizeStripFont = 25, 
+    xAngle = -45, hjust = 0, vjust = 1, xSize = 15, ySize = 15, xAxisSize = 15, 
+    yAxisSize = 15) + ylab("Mean±SD of error rate \n 10-fold cross-validation over 50 simulations") + 
     xlab("Integrative Classifiers") + geom_hline(yintercept = 0.5, linetype = "dashed")
-
-pdf(paste0(WhereAmI, "results/errorRates.pdf"), width = 10, height = 10)
 errorRates
+```
+
+<img src="simulation_study_files/figure-html/unnamed-chunk-6-1.png" width="100%" />
+
+### Selected variables
+
+
+```r
+selectedVars <- do.call(rbind, varsList_repeat) %>% ungroup %>% mutate(Classifier = factor(Classifier, 
+    levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
+    group_by(Classifier, FC, Noise, varType) %>% summarise(Mean = mean(n), SD = sd(n)) %>% 
+    ggplot(aes(x = Classifier, y = Mean, color = varType, fill = varType)) + 
+    geom_bar(stat = "identity") + # geom_errorbar(aes(ymin = Mean, ymax = Mean+SD), position='dodge') +
+facet_grid(FC ~ Noise) + customTheme(sizeStripFont = 25, xAngle = -45, hjust = 0, 
+    vjust = 1, xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) + ylab("Average number of selected variables \n across 3 datasets over 50 simulations") + 
+    geom_hline(yintercept = 90, linetype = "dashed") + xlab("Integrative Classifiers") + 
+    scale_y_continuous(breaks = c(30, 60, 90))
+selectedVars
+```
+
+<img src="simulation_study_files/figure-html/unnamed-chunk-7-1.png" width="100%" />
+
+```r
+pdf(paste0(WhereAmI, "results/simulationResults.pdf"), width = 20, height = 10)
+plot_grid(errorRates, selectedVars, labels = c("A", "B"), label_size = 30)
 dev.off()
 ```
 
 ```
-## quartz_off_screen 
-##                 2
+## pdf 
+##   3
 ```
-
