@@ -13,7 +13,7 @@ biblio-style: genome-biology.csl
 
 ```{r setup, message=FALSE, warning=FALSE, include=FALSE}
 knitr::opts_chunk$set(fig.pos = 'p') # Places figures on their own pages
-knitr::opts_chunk$set(out.width = '100%', dpi=301)
+knitr::opts_chunk$set(out.width = '100%', dpi=300)
 ```
 
 # Table of contents
