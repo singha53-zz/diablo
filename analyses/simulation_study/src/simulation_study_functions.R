@@ -22,8 +22,8 @@ simData = function(fc, noise, J, n, p_relevant, p_irrelevant){
   bComp1 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
   ## Variate for Group 2
   bComp2 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
-  bComp.full <- rbind(bComp1, bComp2) + matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J)
-  bComp_full_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma) + matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J))
+  bComp.full <- rbind(bComp1, bComp2) 
+  bComp_full_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma))
   colnames(bComp.full) <- colnames(bComp_full_irrelevant) <- paste("Dataset", 1:J, sep="_")
   
   ## Generate variates that contribute to the null design
@@ -33,8 +33,8 @@ simData = function(fc, noise, J, n, p_relevant, p_irrelevant){
   bComp1 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
   ## Variate for Group 2
   bComp2 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
-  bComp.null <- rbind(bComp1, bComp2)  + matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J)
-  bComp_null_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma) + matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J))
+  bComp.null <- rbind(bComp1, bComp2)  #+ matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J)
+  bComp_null_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma))
   colnames(bComp.null) <- colnames(bComp_null_irrelevant) <- paste("Dataset", 1:J, sep="_")
   
   ## Generate 3 datasets (first p_relevant variables contribute to the full design, 
@@ -67,8 +67,8 @@ simData = function(fc, noise, J, n, p_relevant, p_irrelevant){
   
   ## add noise
   data <- lapply(1 : J, function(i){
-    i2 <- X2[[i]] #+ matrix(rnorm(length(X2[[i]]), mean = 0, sd = noise), nr = nrow(X2[[i]]))
-    colnames(i2) <- paste(paste(rep(c("corDis", "nonCorDis", "corNonDis", "nonCorNonDis"), 
+    i2 <- X2[[i]] + matrix(rnorm(length(X2[[i]]), mean = 0, sd = noise), nr = nrow(X2[[i]]))
+    colnames(i2) <- paste(paste(rep(c("corDis", "unCorDis", "corNonDis", "unCorNonDis"), 
       c(p_relevant,p_relevant,p_irrelevant,p_irrelevant)), 
       c(1:p_relevant, 1:p_relevant, 1:p_irrelevant, 1:p_irrelevant), sep = "."), "Dat", i, sep = "_")
     rownames(i2) <- paste0("Subj", 1:nrow(i2))
