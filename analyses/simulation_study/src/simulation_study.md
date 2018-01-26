@@ -203,7 +203,7 @@ for (z in 1:nperms) {
 }
 ```
 
-## error rate
+## Error rates
 
 
 ```r

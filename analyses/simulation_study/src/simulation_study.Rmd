@@ -182,7 +182,7 @@ for(z in 1 : nperms){
 
 ## Error rates
 
-```{r}
+```{r, fig.height=10, fig.width=10}
 errorRates <- do.call(rbind, errList_repeat)  %>% 
     mutate(Classifier = factor(Classifier, 
     levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
@@ -202,7 +202,7 @@ errorRates
 
 ### Selected variables
 
-```{r}
+```{r, fig.height=10, fig.width=10}
 selectedVars <- do.call(rbind, varsList_repeat) %>% ungroup %>% 
     mutate(Classifier = factor(Classifier, 
     levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
