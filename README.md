@@ -22,7 +22,7 @@ biblio-style: genome-biology.csl
 * how does DIABLO compares with existing integrative classification schemes (Concatenation and Ensemble)
 * effect of the design (connection between datasets) on the types of variables selected (correlated vs. discriminatory) and error rate
 
-## 3) [Benchmarking]()
+## 3) [Benchmarking](https://github.com/singha53/diablo/blob/master/analyses/benchmarking/src/benchmarking_enrichmentConnectivity.md)
 * apply various unsupervised and supervised approaches to real cancer datasets (colon, kidney, gbm and lung) and identify multi-omic panels of equal sizes and compare them with respect:
   + which variables were selected
   + overlap between variables

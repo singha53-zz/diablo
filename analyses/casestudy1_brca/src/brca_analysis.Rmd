@@ -136,13 +136,13 @@ dev.off()
 ## Optimal DIABLO model
 
 ```{r}
-## minimum error rate
-tune$error.rate %>% 
-  as.data.frame() %>% 
-  mutate(keep = rownames(.)) %>% 
-  gather(comp, error, -keep) %>% 
+all(rownames(tune$error.rate) == rownames(tune$error.rate.sd))
+data.frame(keepX = rep(rownames(tune$error.rate), 3), 
+  meanError = as.numeric(tune$error.rate), 
+  sdError = as.numeric(tune$error.rate.sd),
+  comp = rep(paste0("comp", 1:3), each=nrow(tune$error.rate))) %>% 
   group_by(comp) %>% 
-  filter(error == min(error))
+  filter(meanError == min(meanError))
 ```
 
 ## optimal keepX
@@ -154,43 +154,11 @@ tune$choice.keepX
 
 # DIABLO-supervised
 
-## loadings
-
 ```{r}
 ncomp <- 3
 keepX = tune$choice.keepX
 
 diablo = block.splsda(X = X.train, Y = Y.train, ncomp = ncomp, keepX = keepX, design = design)
-#cv <- perf(diablo, validation = "Mfold", folds = 5, nrepeat = 5, cpus = 5)
-#cv$WeightedVote.error.rate
-
-plotLoadings(diablo)
-```
-
-## Design matrix weights
-
-```{r}
-comp1 <- lapply(diablo$variates, function(i){
-  i[, 1]
-}) %>% do.call(cbind, .) %>% 
-  cor()
-comp2 <- lapply(diablo$variates, function(i){
-  i[, 2]
-}) %>% do.call(cbind, .) %>% 
-  cor()
-comp3 <- lapply(diablo$variates, function(i){
-  i[, 3]
-}) %>% do.call(cbind, .) %>% 
-  cor()
-
-comp1.3 <- matrix(NA, nrow(comp1), ncol(comp1))
-colnames(comp1.3) <- rownames(comp1.3) <- colnames(comp1)
-for(i in 1 : nrow(comp1)){
-  for(j in 1 : ncol(comp1)){
-    comp1.3[i, j] <- paste(round(c(comp1[i,j], comp2[i,j], comp3[i,j]), 2), collapse = ",")
-  }
-}
-comp1.3
 ```
 
 # Number of variables of each omic-type in the diablo panel
@@ -204,7 +172,27 @@ diabloPanel <- mapply(function(x, y, z){
 sapply(diabloPanel, length)
 ```
 
-\pagebreak
+## plot features
+
+```{r}
+lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
+  do.call(rbind, .) %>% 
+  data.frame() %>% 
+  mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
+         feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
+         value.var = abs(value.var)) %>% 
+  group_by(dataset) %>% 
+  arrange(desc(value.var)) %>% 
+  mutate(feature = factor(as.character(feature), feature)) %>% 
+  ggplot(aes(x = feature, y = value.var, fill = dataset, color = dataset)) +
+  geom_bar(stat = "identity")
+
+
+```
+
+
+
+
 
 # Pathway enrichment
 
@@ -214,6 +202,37 @@ mrna <- unique(c(diabloPanel$mRNA, diabloPanel$CpGs, diabloPanel$Proteins)) %>%
   unlist %>% 
   strsplit(., " ") %>% 
   unlist
+
+enrichment <- sear(mrna, "mrna") %>% 
+    group_by(collection, subcollection) %>% 
+    filter(fdr < 0.05) %>% 
+  rowwise() %>% 
+  mutate(mrna = length(unique(intersect(members, diabloPanel$mRNA))),
+         cpg = length(unique(intersect(members, diabloPanel$CpGs))),
+         protein = length(unique(intersect(members, diabloPanel$Proteins)))) %>% 
+  dplyr::select(collection, subcollection, mrna:protein) %>% 
+  filter(collection != "ARCHIVED")
+
+geneset <- enrichment %>% 
+  gather(dataset, n_sig, mrna:protein) %>% 
+  group_by(collection, subcollection) %>% 
+  summarise(total = sum(n_sig))
+
+p <- lapply(unique(geneset$collection), function(i){
+  geneset %>% 
+  filter(collection == i) %>% 
+  ggplot(aes(x = collection, y = total, fill = subcollection)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~collection)
+})
+names(p) <- unique(geneset$collection)
+
+plot_grid(p$BTM, p$C2, p$C3, p$C4, p$C5, p$C6, p$C7, p$H, p$TISSUES, nrow = 2, ncol = 5)
+
+
+```
+
+
 enrichment0 <- sear(mrna, "mrna") %>% 
     group_by(collection, subcollection) %>% 
     filter(fdr < 0.05)
@@ -222,21 +241,24 @@ enrichment <- enrichment0 %>%
   mutate(mrna = length(unique(intersect(members, diabloPanel$mRNA))),
          cpg = length(unique(intersect(members, diabloPanel$CpGs))),
          protein = length(unique(intersect(members, diabloPanel$Proteins)))) %>% 
-  dplyr::select(collection, mrna:protein)
+  dplyr::select(collection, subcollection, mrna:protein) %>% 
+  filter(collection != "ARCHIVED")
   
 n_sigAll0 <- enrichment %>% 
-  group_by(collection) %>% 
-  dplyr::summarise(n = n())
-n_sigAll <- as.matrix(n_sigAll0[-1, -1])
-rownames(n_sigAll) <- n_sigAll0$collection[-1]
+  group_by(collection, subcollection) %>% 
+  dplyr::summarise(n = n()) %>% 
+  filter(collection != "ARCHIVED")
+n_sigAll <- as.matrix(n_sigAll0[, -1])
+rownames(n_sigAll) <- n_sigAll0$collection
 
 n_sigSingle0 <- enrichment %>% 
   dplyr::group_by(collection) %>% 
   dplyr::summarise(mrna = sum(mrna),
                    cpg = sum(cpg),
-                   protein = sum(protein))
-n_sigSingle <- as.matrix(n_sigSingle0[-1, -1])
-rownames(n_sigSingle) <- n_sigSingle0$collection[-1]
+                   protein = sum(protein)) %>% 
+  filter(collection != "ARCHIVED")
+n_sigSingle <- as.matrix(n_sigSingle0[, -1])
+rownames(n_sigSingle) <- n_sigSingle0$collection
 all(rownames(n_sigAll) == rownames(n_sigSingle))
 genesetResults <- scale(t(n_sigSingle), center = FALSE, scale = rowSums(n_sigSingle)) * t(cbind(n_sigAll, n_sigAll, n_sigAll))
 
