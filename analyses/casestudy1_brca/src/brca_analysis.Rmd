@@ -172,21 +172,106 @@ diabloPanel <- mapply(function(x, y, z){
 sapply(diabloPanel, length)
 ```
 
+## overlap across different omic layers
+
+```{r}
+venn(diabloPanel)
+intersect(diabloPanel$mRNA, diabloPanel$CpGs)
+intersect(diabloPanel$mRNA, diabloPanel$Proteins)
+
+links <- data.frame(from = rep(names(diabloPanel), sapply(diabloPanel, length)),
+                    to = unlist(diabloPanel))
+nodes <- data.frame(id = c(names(diabloPanel), unique(unlist(diabloPanel))))
+
+library(igraph)
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=T) 
+plot(net)
+
+
+```
+
+
 ## plot features
 
 ```{r}
-lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
+## mRNA
+featplot_mrna <- rbind(selectVar(diablo, comp = 1)[["mRNA"]][["value"]], 
+  selectVar(diablo, comp = 2)[["mRNA"]][["value"]],
+  selectVar(diablo, comp = 3)[["mRNA"]][["value"]]) %>% 
+  data.frame() %>% 
+  mutate(dataset = "mRNA",
+         feature = rownames(.),
+         value.var = abs(value.var)) %>% 
+  group_by(dataset) %>% 
+  arrange(desc(value.var)) %>% 
+  mutate(feature = factor(as.character(feature), feature)) %>% 
+  ggplot(aes(x = feature, y = value.var)) +
+  geom_bar(stat = "identity") +
+  ggtitle("mRNA") +
+  ylab("Variable contribution (absolute loading value)") +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
+featplot_mrna
+```
+
+
+
+## miRNA
+featplot_mirna <- lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
   do.call(rbind, .) %>% 
   data.frame() %>% 
   mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
          feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
          value.var = abs(value.var)) %>% 
+  filter(dataset == "miRNA") %>% 
   group_by(dataset) %>% 
   arrange(desc(value.var)) %>% 
   mutate(feature = factor(as.character(feature), feature)) %>% 
-  ggplot(aes(x = feature, y = value.var, fill = dataset, color = dataset)) +
-  geom_bar(stat = "identity")
+  ggplot(aes(x = feature, y = value.var)) +
+  geom_bar(stat = "identity") +
+  ggtitle("miRNA") +
+  ylab("Variable contribution (absolute loading value)") +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
+featplot_mirna
+## CpGs
+featplot_cpgs <- lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
+  do.call(rbind, .) %>% 
+  data.frame() %>% 
+  mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
+         feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
+         value.var = abs(value.var)) %>% 
+  filter(dataset == "CpGs") %>% 
+  group_by(dataset) %>% 
+  arrange(desc(value.var)) %>% 
+  mutate(feature = factor(as.character(feature), feature)) %>% 
+  ggplot(aes(x = feature, y = value.var)) +
+  geom_bar(stat = "identity") +
+  ggtitle("CpGs") +
+  ylab("Variable contribution (absolute loading value)") +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
+featplot_cpgs
+## Proteins
+featplot_proteins <- lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
+  do.call(rbind, .) %>% 
+  data.frame() %>% 
+  mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
+         feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
+         value.var = abs(value.var)) %>% 
+  filter(dataset == "Proteins") %>% 
+  group_by(dataset) %>% 
+  arrange(desc(value.var)) %>% 
+  mutate(feature = factor(as.character(feature), feature)) %>% 
+  ggplot(aes(x = feature, y = value.var)) +
+  geom_bar(stat = "identity") +
+  ggtitle("Proteins") +
+  ylab("Variable contribution (absolute loading value)") +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
+featplot_proteins
 
+plot_grid(featplot_mrna, featplot_mirna, featplot_cpgs, featplot_proteins, nrow = 2)
 
 ```
 
