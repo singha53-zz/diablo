@@ -30,7 +30,7 @@ biblio-style: genome-biology.csl
   + ability to discriminant between phenotypic groups
   + Numbers of significant gene sets using various gene set collections
 
-## 4) [Case study 1: BRCA - Standard workflow of DIABLO]()
+## 4) [Case study 1: BRCA - Standard workflow of DIABLO](https://github.com/singha53/diablo/blob/master/analyses/casestudy1_brca/src/brca_analysis.md)
 * demonstrate use of the tune function
 * assess stability of panel features
 * show ability of DIABLO to uncover features (as part of the multi-omic biomarker signature) already associated with breast cancer
