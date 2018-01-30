@@ -12,7 +12,7 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE)
 
 WhereAmI <- "~/Dropbox/Manuscript/diablo/analyses/casestudy1_brca/"
 
@@ -29,6 +29,7 @@ library(venn)
 library(igraph)
 library(ggraph)
 library(ggalt)
+library(RColorBrewer)
 
 ## load data
 load(paste0(WhereAmI, "data/trainTestDatasetsNormalized.RDATA"))
@@ -329,6 +330,7 @@ TestError <- apply(pred$WeightedVote$centroids.dist, 2, function(y) {
       return(err = err)
     })
 rownames(TestError) <- c(levels(Y.test), "Overall.ER", "Overall.BER")
+TestError[, "comp3"]
 ```
 
 # DIABLO (Sample plots)
@@ -433,6 +435,12 @@ dendPlot(ceb, mode="hclust")
 
 mark.groups <- split(as.character(nodes$id), factor(ceb$membership))
 mark.groups <- mark.groups[sapply(mark.groups, length) > 3]
+sapply(mark.groups, length)
+
+sapply(names(diabloPanel), function(i){
+  length(grep(i, mark.groups$`1`))
+})
+
 mark.col <- rainbow(length(mark.groups), alpha=.5)
 
 pdf(paste0(WhereAmI, "results/Figures/network_brca.pdf"), height = 8, width = 8)
