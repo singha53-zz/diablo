@@ -1,12 +1,14 @@
 ---
 title: "Case study 1: Breast cancer"
-author: "Amrit Singh"
-date: '2017-09-20'
+bibliography: /Users/asingh/Dropbox/Manuscript/diablo/mybib.bib
+thanks: "Replication files are available at https://github.com/singha53/diablo"
 output:
-  pdf_document:
-    toc: yes
   html_document:
     toc: yes
+    theme: united
+    highlight: tango
+    keep_md: yes
+biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ---
 
 ```{r setup, include=FALSE}
@@ -24,6 +26,9 @@ require(parallel)
 library(sear)
 library(UpSetR)
 library(venn)
+library(igraph)
+library(ggraph)
+library(ggalt)
 
 ## load data
 load(paste0(WhereAmI, "data/trainTestDatasetsNormalized.RDATA"))
@@ -170,6 +175,9 @@ diabloPanel <- mapply(function(x, y, z){
    y = lapply(selectVar(diablo, comp = 2)[-5], function(i) unlist(i[[1]])),
    z = lapply(selectVar(diablo, comp = 3)[-5], function(i) unlist(i[[1]])))
 sapply(diabloPanel, length)
+
+## only keep unique features
+diabloPanel <- lapply(diabloPanel, unique)
 ```
 
 ## overlap across different omic layers
@@ -179,216 +187,16 @@ venn(diabloPanel)
 intersect(diabloPanel$mRNA, diabloPanel$CpGs)
 intersect(diabloPanel$mRNA, diabloPanel$Proteins)
 
-links <- data.frame(from = rep(names(diabloPanel), sapply(diabloPanel, length)),
-                    to = unlist(diabloPanel))
-nodes <- data.frame(id = c(names(diabloPanel), unique(unlist(diabloPanel))))
-
-library(igraph)
-net <- graph_from_data_frame(d=links, vertices=nodes, directed=T) 
-plot(net)
-
-
-```
-
-
-## plot features
-
-```{r}
-## mRNA
-featplot_mrna <- rbind(selectVar(diablo, comp = 1)[["mRNA"]][["value"]], 
-  selectVar(diablo, comp = 2)[["mRNA"]][["value"]],
-  selectVar(diablo, comp = 3)[["mRNA"]][["value"]]) %>% 
-  data.frame() %>% 
-  mutate(dataset = "mRNA",
-         feature = rownames(.),
-         value.var = abs(value.var)) %>% 
-  group_by(dataset) %>% 
-  arrange(desc(value.var)) %>% 
-  mutate(feature = factor(as.character(feature), feature)) %>% 
-  ggplot(aes(x = feature, y = value.var)) +
-  geom_bar(stat = "identity") +
-  ggtitle("mRNA") +
-  ylab("Variable contribution (absolute loading value)") +
-  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
-featplot_mrna
-```
-
-
-
-## miRNA
-featplot_mirna <- lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
-  do.call(rbind, .) %>% 
-  data.frame() %>% 
-  mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
-         feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
-         value.var = abs(value.var)) %>% 
-  filter(dataset == "miRNA") %>% 
-  group_by(dataset) %>% 
-  arrange(desc(value.var)) %>% 
-  mutate(feature = factor(as.character(feature), feature)) %>% 
-  ggplot(aes(x = feature, y = value.var)) +
-  geom_bar(stat = "identity") +
-  ggtitle("miRNA") +
-  ylab("Variable contribution (absolute loading value)") +
-  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
-featplot_mirna
-## CpGs
-featplot_cpgs <- lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
-  do.call(rbind, .) %>% 
-  data.frame() %>% 
-  mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
-         feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
-         value.var = abs(value.var)) %>% 
-  filter(dataset == "CpGs") %>% 
-  group_by(dataset) %>% 
-  arrange(desc(value.var)) %>% 
-  mutate(feature = factor(as.character(feature), feature)) %>% 
-  ggplot(aes(x = feature, y = value.var)) +
-  geom_bar(stat = "identity") +
-  ggtitle("CpGs") +
-  ylab("Variable contribution (absolute loading value)") +
-  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
-featplot_cpgs
-## Proteins
-featplot_proteins <- lapply(selectVar(diablo)[1:4], function(i){i$value}) %>% 
-  do.call(rbind, .) %>% 
-  data.frame() %>% 
-  mutate(dataset = sapply(strsplit(rownames(.), "\\."), function(i) i[1]),
-         feature = sapply(strsplit(rownames(.), "\\."), function(i) i[2]),
-         value.var = abs(value.var)) %>% 
-  filter(dataset == "Proteins") %>% 
-  group_by(dataset) %>% 
-  arrange(desc(value.var)) %>% 
-  mutate(feature = factor(as.character(feature), feature)) %>% 
-  ggplot(aes(x = feature, y = value.var)) +
-  geom_bar(stat = "identity") +
-  ggtitle("Proteins") +
-  ylab("Variable contribution (absolute loading value)") +
-  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
-featplot_proteins
-
-plot_grid(featplot_mrna, featplot_mirna, featplot_cpgs, featplot_proteins, nrow = 2)
-
-```
-
-
-
-
-
-# Pathway enrichment
-
-```{r, fig.height=7, fig.width=10}
-mrna <- unique(c(diabloPanel$mRNA, diabloPanel$CpGs, diabloPanel$Proteins)) %>% 
-  strsplit(., ";") %>% 
-  unlist %>% 
-  strsplit(., " ") %>% 
-  unlist
-
-enrichment <- sear(mrna, "mrna") %>% 
-    group_by(collection, subcollection) %>% 
-    filter(fdr < 0.05) %>% 
-  rowwise() %>% 
-  mutate(mrna = length(unique(intersect(members, diabloPanel$mRNA))),
-         cpg = length(unique(intersect(members, diabloPanel$CpGs))),
-         protein = length(unique(intersect(members, diabloPanel$Proteins)))) %>% 
-  dplyr::select(collection, subcollection, mrna:protein) %>% 
-  filter(collection != "ARCHIVED")
-
-geneset <- enrichment %>% 
-  gather(dataset, n_sig, mrna:protein) %>% 
-  group_by(collection, subcollection) %>% 
-  summarise(total = sum(n_sig))
-
-p <- lapply(unique(geneset$collection), function(i){
-  geneset %>% 
-  filter(collection == i) %>% 
-  ggplot(aes(x = collection, y = total, fill = subcollection)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~collection)
-})
-names(p) <- unique(geneset$collection)
-
-plot_grid(p$BTM, p$C2, p$C3, p$C4, p$C5, p$C6, p$C7, p$H, p$TISSUES, nrow = 2, ncol = 5)
-
-
-```
-
-
-enrichment0 <- sear(mrna, "mrna") %>% 
-    group_by(collection, subcollection) %>% 
-    filter(fdr < 0.05)
-enrichment <- enrichment0 %>% 
-  rowwise() %>% 
-  mutate(mrna = length(unique(intersect(members, diabloPanel$mRNA))),
-         cpg = length(unique(intersect(members, diabloPanel$CpGs))),
-         protein = length(unique(intersect(members, diabloPanel$Proteins)))) %>% 
-  dplyr::select(collection, subcollection, mrna:protein) %>% 
-  filter(collection != "ARCHIVED")
-  
-n_sigAll0 <- enrichment %>% 
-  group_by(collection, subcollection) %>% 
-  dplyr::summarise(n = n()) %>% 
-  filter(collection != "ARCHIVED")
-n_sigAll <- as.matrix(n_sigAll0[, -1])
-rownames(n_sigAll) <- n_sigAll0$collection
-
-n_sigSingle0 <- enrichment %>% 
-  dplyr::group_by(collection) %>% 
-  dplyr::summarise(mrna = sum(mrna),
-                   cpg = sum(cpg),
-                   protein = sum(protein)) %>% 
-  filter(collection != "ARCHIVED")
-n_sigSingle <- as.matrix(n_sigSingle0[, -1])
-rownames(n_sigSingle) <- n_sigSingle0$collection
-all(rownames(n_sigAll) == rownames(n_sigSingle))
-genesetResults <- scale(t(n_sigSingle), center = FALSE, scale = rowSums(n_sigSingle)) * t(cbind(n_sigAll, n_sigAll, n_sigAll))
-
-genesetResults %>% 
-  as.data.frame() %>% 
-  mutate(omic = rownames(.)) %>% 
-  gather(collection, prop, -omic) %>% 
-  #mutate(collection = factor(collection, c("C1","C3","C6","C7","TISSUES","C4","C2","H","C5","BTM"))) %>% 
-  ggplot(aes(x = collection, y = prop, fill = omic, color = omic)) +
-  geom_bar(stat = "identity") +
-  facet_wrap(~collection, scales = "free", ncol = 5) +
-  customTheme(sizeStripFont = 20, xAngle = 0, hjust = 0.5, vjust = 0.5, xSize = 15, 
-              ySize = 15, xAxisSize = 15, yAxisSize = 15) +
-  ylab("Number of significant gene sets (FDR < 5%")
-
-```
-
-\pagebreak
-
-# Which features are related to breast cancer?
-  * obtained Breast cancer related genes from four sources:
-  1) DriverDBv2 (under the cancer tab; tissue: breast cancer, dataset: breast_invasive_carcinoma (TCGA, US))
-  2) MolSigDB
-  3) Jensen Diseases (Enrichr)
-  4) OMIM (Enrichr)
-
-```{r}
-driverdbv2 <- read.delim(paste0(WhereAmI, "results/breastCancer_relatedGenes/driverdbv2.txt"), header = FALSE) %>% 
+driverdbv2 <- read.delim(paste0(WhereAmI, "results/disease_collections/driverdbv2.txt"), header = FALSE) %>% 
   as.matrix %>% 
   as.character()
-molsigdb <- 
 
-molsigdb <- filter(collections, geneset %in% enrichment0$geneset[enrichment0$geneset %in% grep("BREAST", collections$geneset, value = TRUE)])$members_mrna %>% 
-  unlist %>% unique
+mircancer <- read.delim(paste0(WhereAmI, "results/disease_collections/miRCancerOctober2017.txt"), header = FALSE)
+mircancer <- mircancer[grep("breast", tolower(as.character(mircancer$V2))), "V1"] %>% as.character() %>% unique()
 
-jensen0 <- read.csv(paste0(WhereAmI, "results/breastCancer_relatedGenes/Jensen_DISEASES.csv"), header = FALSE)
-jensen <- apply(jensen0[, -1], 1, function(i){
-    x <- as.character(as.matrix(i))[as.character(as.matrix(i)) != ""]
-    x[!is.na(x)]
-  })
-names(jensen) <- as.character(jensen0[,1])
-jensen <- jensen[grep("breast", names(jensen), value = TRUE)] %>% 
-  unlist %>% unique
+molsigdb <- collections[grep("BREAST", collections$geneset), "members_mrna"] %>% unlist %>% unique
 
-omim0 <- read.delim(paste0(WhereAmI, "results/breastCancer_relatedGenes/OMIM_Disease.txt"), header = FALSE)
+omim0 <- read.delim(paste0(WhereAmI, "results/disease_collections/OMIM_Disease.txt"), header = FALSE)
 omim <- apply(omim0[, -1], 1, function(i){
     x <- as.character(as.matrix(i))[as.character(as.matrix(i)) != ""]
     x[!is.na(x)]
@@ -400,77 +208,91 @@ omim <- omim[grep("breast", names(omim), value = TRUE)] %>%
 brca_genes = list(DIABLO = unlist(unlist(diabloPanel)),
                   MolSigDB = molsigdb,
                   DriverDBv2 = driverdbv2,
-                  OMIM = omim)
+                  OMIM = omim,
+  miRCancer=mircancer)
 venn(brca_genes, ilab=TRUE, zcolor = "style")
 
+
+brcaDatabase <- data.frame(database = rep(c("MolSigDB", "DriverDBv2", "OMIM", "miRCancer"), c(length(molsigdb), length(driverdbv2), length(omim), length(mircancer))),
+  feature = c(molsigdb, driverdbv2, omim, mircancer))
+
 ```
 
-## types of omic variables in the overlap
+
+## plot features
 
 ```{r}
-mirsInput <- fromList(brca_genes)
-upset(mirsInput, sets = colnames(mirsInput), sets.bar.color = "#56B4E9",
-    queries = list(list(query = intersects, params = list("DIABLO"), active = TRUE, color = "blue")))
+databases <- c("No overlap", "miRCancer", "DriverDBv2", "MolSigDB", "MolSigDB_DriverDBv2", "MolSigDB_DriverDBv2_OMIM", "MolSigDB_OMIM")
+featurePlot = function(panel, omicName, database){
+  Dat <- rbind(selectVar(diablo, comp = 1)[[omicName]][["value"]], 
+  selectVar(diablo, comp = 2)[[omicName]][["value"]],
+  selectVar(diablo, comp = 3)[[omicName]][["value"]]) %>% 
+  data.frame() %>% 
+  mutate(dataset = omicName,
+         feature = gsub(";", "\n", rownames(.)),
+         value.var = abs(value.var)) %>% 
+  group_by(dataset) %>% 
+  arrange(value.var) %>% 
+  mutate(feature = factor(as.character(feature), feature))
+  Dat$database <- sapply(as.character(Dat$feature), function(i){
+  paste(unique(as.character(subset(brcaDatabase, feature %in% unlist(strsplit(i, ";")))$database)), collapse = "_")})
+  Dat$database[Dat$database == ""] <- "No overlap"
+  Dat$database <- factor(as.character(Dat$database), databases)
+  
+  Segment <- geom_segment(aes(yend = feature, color = database), xend = 0, size = 1)
+  Point <- geom_point(size = 4, aes(color = database, fill = database)) 
+  Theme <- theme_bw() + theme(panel.grid.major.y = element_blank(),legend.justification = c(1, 0.5))
+  
+  ggplot(Dat, aes(x = value.var, y = feature)) +
+ 	Segment +
+ 	Point +
+	Theme +
+	ggtitle(omicName) + ylab("Variables")
+}
+
+p1 <- featurePlot(panel=diabloPanel, omicName="mRNA", database=database) +
+  theme(legend.position = c(0.95,0.15)) + scale_color_manual(values=c("#000000", "#E69F00", "#56B4E9")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=16), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("", limits = c(0, 1), breaks = seq(0,1,0.2)) 
+p2 <- featurePlot(panel=diabloPanel, omicName="miRNA", database=database) +
+  theme(legend.position = c(0.95,0.15)) + ylab("") + scale_color_manual(values=c("#000000", "#0072B2")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=16), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("", limits = c(0, 1), breaks = seq(0,1,0.2))
+p3 <- featurePlot(panel=diabloPanel, omicName="CpGs", database=database) +
+  theme(legend.position = c(0.95,0.15)) + scale_color_manual(values=c("#000000", "#E69F00")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=16), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("Variable contributions \n absolute loadings", limits = c(0, 1), breaks = seq(0,1,0.2))
+p4 <- featurePlot(panel=diabloPanel, omicName="Proteins", database=database) +
+  theme(legend.position = c(0.95,0.2)) + ylab("") + scale_color_manual(values=c("#000000", "#CC79A7", "#E69F00", "#56B4E9", "#009E73", "#F0E442")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=10), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("Variable contributions \n absolute loadings", limits = c(0, 1), breaks = seq(0,1,0.2))
+
+pdf(paste0(WhereAmI, "results/Figures/brcaPanel_features.pdf"), width = 10, height=13)
+plot_grid(p1, p2, p3, p4, ncol = 2)
+dev.off()
+
+p1
 ```
 
+# Component plots
 
-
-## Connectivity
-
-```{r}
-cutoff <- 0.5
-
-combinedDat <- mapply(function(x, y){
-  x[, y]
-}, x = X.train, y = diabloPanel) %>% 
-  do.call(cbind, .)
-## generate network object
-adjMat0 = cor(combinedDat)
-adjMat <- adjMat0
-adjMat[abs(adjMat) < cutoff] <- 0
-adjMat[abs(adjMat) > cutoff] <- 1
-netStat <- networkStats(adjMat = adjMat, mode = "graph", maxlen = 6)
-
-```
-
-## Network
-
-```{r}
-col <- brewer.pal(n = length(X.train), name = "Set1")
-nodeCol = rep(col, sapply(diabloPanel, length))
-## plot network
-nrelations <- network::network(adjMat, directed=FALSE)
-gplot(nrelations, usearrows=FALSE, vertex.col = nodeCol, pch = 19)
-legend("topleft", names(X.train), col = col, pch = 19, bty = "n")
-
-```
-
-# Plot samples plots for the supervised and unsupervised DIABLO analyses
-
-# Supervised
-  * R^2 for comp1 and comp2
-
-```{r}
-df.super <- as.data.frame(Reduce("+", diablo$variates[-length(diablo$variates)])[,1:2]/length(X.train))
-df.super$Analysis <- "DIABLO"
-df.super$Pheno <- Y.train
-
-# proportion of variation explained
-summary(lm(df.super$`comp 1` ~ df.super$Pheno))$r.squared
-summary(lm(df.super$`comp 2` ~ df.super$Pheno))$r.squared
-
-#pdf(paste0(WhereAmI, "Figures/diablo_supervised.pdf"), height = 4, width = 5)
-df.super %>% 
-  ggplot(aes(`comp 1`, `comp 2`, group = Pheno, color = Pheno)) + geom_point() +
-  facet_wrap(~Analysis) + stat_ellipse() +
-  customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, 
-              vjust = 0.5, xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
-  xlab(expression("Consensus component 1")) + 
-  ylab(expression("Consensus component 2"))
-#dev.off()
-```
-
-## Evaulate performance in test dataset
+## Evaluate performance of diablo panel
 
 ```{r}
 ## Training data
@@ -538,59 +360,111 @@ varDat.test <- varDat.test %>% group_by(Class, subj) %>%
   rbind(., varDat.test) %>% 
   mutate(Dataset = factor(Dataset, c("Consensus", "mRNA", "miRNA", "CpGs", "Proteins"))) 
 
-#pdf(paste0(WhereAmI, "Figures/SamplePlots_trainEllipses_testPoints.pdf"), width = 14, height = 3.5)
 p1 <- filter(varDat.test, Dataset == "Consensus") %>% 
   ggplot(aes(x = `comp 1`, y = `comp 2`, color = Class)) + 
-  geom_point(size = 1) +
+  geom_point(size = 2) +
   facet_wrap(~Dataset, scales = "free", ncol = 5) + 
    stat_ellipse(data = filter(varDat.train, Dataset == "Consensus"), size = 1) +
-  customTheme(sizeStripFont = 15, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
-  xlab("Component 1") + ylab("Component 2") +
-  theme(legend.position = "none")
-#dev.off()
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
+  xlab("Component 1") + ylab("Component 2") + 
+  theme(strip.text.x = element_text(size=26, face = "bold")) + 
+  scale_color_manual(values=color.mixo(1:4))
 
 p2 <- filter(varDat.test, Dataset != "Consensus") %>% 
   ggplot(aes(x = `comp 1`, y = `comp 2`, color = Class)) + 
-  geom_point(size = 1) +
+  geom_point(size = 2) +
   facet_wrap(~Dataset, scales = "free", ncol = 2) + 
    stat_ellipse(data = filter(varDat.train, Dataset != "Consensus"), size = 1) +
-  customTheme(sizeStripFont = 15, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
-  xlab("Component 1") + ylab("Component 2")
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
+  xlab("Component 1") + ylab("Component 2") + 
+  theme(strip.text.x = element_text(size=26, face = "bold")) + 
+  scale_color_manual(values=color.mixo(1:4))
 
-#pdf(paste0(WhereAmI, "Figures/SamplePlots_trainEllipses_testPoints.pdf"), height = 5, width = 10)
-multiplot(p1, p2, cols=2, layout=NULL) 
-#dev.off()
+pdf(paste0(WhereAmI, "results/Figures/SamplePlots_trainEllipses_testPoints.pdf"), height = 13, width = 10)
+plot_grid(p1, p2, ncol=1) 
+dev.off()
 
 
-
-```
-
-## Correlation between components
-
-```{r}
-#pdf(paste0(WhereAmI, "Figures/SamplePlots.pdf"))
-plotIndiv(diablo, ellipse = TRUE, ellipse.level = 0.68, star = F, ind.names = FALSE)
-#dev.off()
-
-#pdf(paste0(WhereAmI, "Figures/splomPlots.pdf"))
-plotDiablo(diablo)
-#dev.off()
 ```
 
 ## heatmap
 
-```{r, fig.height=10, fig.width=9}
-#pdf(paste0(WhereAmI, "Figures/heatmap.pdf"))
-cimDiablo(diablo)
-#dev.off()
+```{r}
+pdf(paste0(WhereAmI, "results/Figures/heatmap_brca.pdf"), height = 10, width = 8)
+cimDiablo(diablo, row.names = FALSE, col.names = FALSE)
+dev.off()
+
+
 ```
 
-# Circos plot
+# network
 
 ```{r}
-#pdf(paste0(WhereAmI, "Figures/circosPlot.pdf"))
-#circosPlot(diablo, cutoff = 0.7)
-#dev.off()
+corMat <- mapply(function(x, y){
+  y[, x]
+}, x = diabloPanel, y = X.train, SIMPLIFY = FALSE) %>% 
+  do.call(cbind, .) %>% 
+  cor
+colnames(corMat) <- rownames(corMat) <- paste(rep(names(diabloPanel), sapply(diabloPanel, length)), colnames(corMat), sep="_")
+
+corMat[lower.tri(corMat)] <- 0
+diag(corMat) <- 0
+
+color.blocks = brewer.pal(n = 12, name = "Paired")[seq(2, 12, by = 2)]
+links <- corMat %>% 
+  as.data.frame() %>% 
+  mutate(to = rownames(.)) %>% 
+  gather(from, cor, -to) %>% 
+  filter(abs(cor) > 0.4) %>% 
+  mutate(Color = ifelse(cor > 0, "red", "blue"))
+nodes <- data.frame(id = unique(c(links$to, links$from)))
+nodes$datasets <- sapply(strsplit(as.character(nodes$id), "_"), function(i) i[1])
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=FALSE) 
+E(net)$color <- links$Color
+V(net)$color <- color.blocks[as.numeric(factor(nodes$datasets, names(diabloPanel)))]
+E(net)$weight <- abs(links$cor)
+weight <- E(net)$weight
+weight[weight == 0.5] <- 0.3
+
+ceb <- cluster_edge_betweenness(net) 
+dendPlot(ceb, mode="hclust")
+
+mark.groups <- split(as.character(nodes$id), factor(ceb$membership))
+mark.groups <- mark.groups[sapply(mark.groups, length) > 3]
+mark.col <- rainbow(length(mark.groups), alpha=.5)
+
+pdf(paste0(WhereAmI, "results/Figures/network_brca.pdf"), height = 8, width = 8)
+plot(net, edge.curved=.2, vertex.label.cex=0.01, vertex.size=6, mark.groups=mark.groups, 
+  mark.col=mark.col, vertex.label.color="black") 
+legend("bottomleft", names(diabloPanel), col=unique(V(net)$color), pch = 19, bty="n")
+dev.off()
+
+## perform gene set enrichment analysis on each cluster of features
+## intersection > 5 genes
+input <- unlist(strsplit(sapply(strsplit(mark.groups[[1]], "_"), function(i) i[2]), ";"))
+enrichment <- sear(input, "mrna") %>% 
+    group_by(collection, subcollection) %>% 
+    filter(fdr < 0.05, collection %in% "C2") %>% 
+    filter(subcollection != "CGP")
+
+pdf(paste0(WhereAmI, "results/Figures/genesetEnrichment_brca.pdf"), height = 7, width = 7)
+enrichment %>% ungroup %>% 
+  mutate(geneset = tolower(sapply(strsplit(as.character(geneset), "_"), function(i) paste(i[-1], collapse=" ")))) %>% 
+    arrange(desc(fdr)) %>% 
+  #mutate(geneset = sapply(strsplit(as.character(a$geneset), " "), function(i){
+  #       ifelse(length(i) >= 5, paste(c(i[1:5], i[-c(1:5)]), collapse="\n"), paste(i, collapse = " "))
+  #  })) %>% 
+    mutate(geneset = factor(geneset, unique(geneset))) %>% 
+  ggplot(aes(x = geneset, y = -log10(fdr), fill = subcollection, color = subcollection)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
+    xSize = 20, ySize = 9, xAxisSize = 20, yAxisSize = 20) +
+  theme(legend.position = c(0.55,0.1)) +
+  ylab("Gene sets") +
+  xlab(expression("Significance (-log"[10]~"FDR)"))
+dev.off()
+
 ```
