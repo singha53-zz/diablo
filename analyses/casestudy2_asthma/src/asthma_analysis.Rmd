@@ -1,18 +1,20 @@
 ---
 title: "asthma_analysis"
-author: "Amrit Singh"
-date: '2018-01-18'
+bibliography: /Users/asingh/Dropbox/Manuscript/diablo/mybib.bib
+thanks: "Replication files are available at https://github.com/singha53/diablo"
 output:
-  pdf_document:
-    toc: yes
   html_document:
     toc: yes
+    theme: united
+    highlight: tango
+    keep_md: yes
+biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE)
 
-WhereAmI <- "/Users/asingh/Dropbox/Manuscript/mixOmics_org_DIABLO/casestudy_asthma/"
+WhereAmI <- "/Users/asingh/Dropbox/Manuscript/diablo/analyses/casestudy2_asthma/"
 
 # load libraries
 library(corrplot)
