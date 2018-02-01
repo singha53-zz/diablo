@@ -51,16 +51,15 @@ fev1 <- read.csv(paste0(WhereAmI, "data/fev1Data.csv"), row.names = 1)[, c("BLFE
 
 p <- scale(t(fev1), center = fev1$BLFEV, scale = fev1$BLFEV) %>% as.data.frame() %>%
   tbl_df() %>%
-  mutate(Time = c(0, 10, 20, 30, 45, 60, 90, 120, 180 ,240, 300, 360, 420)) %>%
+  mutate(Time = c(0, 10, 20, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420)) %>%
   tidyr::gather(Subject, FEV1, -Time) %>%
   filter(Time %in% c(0, 10, 20, 30, 45, 60, 90, 120)) %>%
+  mutate(Time = Time/60) %>% 
   mutate(fev1 = 100*FEV1) %>%
-  ggplot(aes(x = Time, y = fev1, fill = Subject, color = Subject)) +
-  geom_point() + geom_line(color="black")
-  
-#pdf(paste0(WhereAmI, "7-Figure6_asthmaAnalysis/Figure6A.pdf"))
-p + scale_y_continuous(expression('Percent drop in '~ FEV[1])) + theme_bw() +
-  scale_x_continuous(expression('Time (minutes)')) +
+  ggplot(aes(x = Time, y = fev1, group = Subject)) +
+  geom_point() + geom_line(color="black") +
+  scale_y_continuous(expression('Percent drop in '~ FEV[1])) + theme_bw() +
+  scale_x_continuous(expression('Time (hours)')) +
   theme(axis.text.y = element_text(size = 15, hjust = 1)) + theme(axis.text.x = element_text(size = 15, hjust = 0.5))+
   theme(axis.title.x=element_text(size = 15)) + theme(axis.title.y=element_text(size = 15,angle = 90))+ 
   theme(legend.key = element_rect(colour = "black", fill="white"))  +
@@ -69,7 +68,11 @@ p + scale_y_continuous(expression('Percent drop in '~ FEV[1])) + theme_bw() +
                                         size = 1), strip.text.x = element_text(size=20)) +
   geom_hline(yintercept = 0, colour="yellow3", linetype = "longdash") +
   theme(legend.position="none")
-#dev.off()
+
+pdf(paste0(WhereAmI, "results/Figures/fev1Plots.pdf"), width = 7, height = 5)
+p
+dev.off()
+
 ```
 
 # DIABLO
@@ -81,6 +84,8 @@ X <- list(cells=cells, gene.module=gene.module, metabolite.module=metabolite.mod
 time <- demo$Time
 Cov <- data.frame(sample = rep(1:14, 2), time = demo$Time)
 A = lapply(X, function(i) suppressMessages(withinVariation(X = i, design = Cov)))
+
+lapply(A, dim)
 
 ## run DIABLO
 ncomp <- 2
@@ -126,11 +131,11 @@ leave.one.out.cv = function(X, Y, ncomp, keepX, design, sample){
   }
   avgVote <-  list(unpaired = unlist(averageVotes_unpaired), paired=unlist(averageVotes_paired))
   avgVote <- lapply(avgVote, function(i){
-    roc.score = roc(response = sapply(strsplit(names(unlist(averageVotes_unpaired)), "\\."), function(i) i[3]), predictor = i, plot = FALSE, percent = TRUE, na.rm =TRUE)
+    roc.score = roc(response = sapply(strsplit(names(unlist(averageVotes_unpaired)), "\\."), function(i) i[3]), predictor = i, plot = FALSE, percent = TRUE, na.rm =TRUE, ci = TRUE)
     roc.res = data.frame(Specificity = rev(roc.score$specificities), Sensitivity = rev(roc.score$sensitivities))
     roc.res$fp = 100 - as.numeric(roc.res$Specificity)
     roc.res$tp = as.numeric(roc.res$Sensitivity)
-    auc=roc.score$auc
+    auc= paste(c(paste0("AUC = ", round(roc.score$auc, 1), "%"), paste("95% CI:", paste(paste0(round(as.numeric(roc.score$ci),1)[-2], "%"), collapse = "-"))), collapse = "\n")
     return(list(roc.res=roc.res, auc=auc))
   })
 avgVote
@@ -139,7 +144,7 @@ avgVote
 cv <- leave.one.out.cv(X, Y, ncomp, keepX, design, sample)
 
 aucPlot <- rbind(cv$unpaired$roc.res, cv$paired$roc.res) %>% 
-  mutate(Time = c(rep("DIABLO", nrow(cv$unpaired$roc.res)), rep("DIABLOw", nrow(cv$paired$roc.res)))) %>% 
+  mutate(Time = c(rep("DIABLO", nrow(cv$unpaired$roc.res)), rep("mDIABLO", nrow(cv$paired$roc.res)))) %>% 
   ggplot(aes(x = fp, y = tp, fill = Time, color = Time)) +
   geom_abline(intercept = 0, slope = 1, col = "gray", linetype="dashed")  +
   geom_point() +
@@ -147,8 +152,8 @@ aucPlot <- rbind(cv$unpaired$roc.res, cv$paired$roc.res) %>%
   customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, 
     vjust = 0.5, xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
   xlab("100 - Specificity") + ylab("Sensitivity") +
-  annotate("text", label = paste0("AUC = ", round(cv$unpaired$auc, 1), "%"), x = 75, y = 50, size = 5, colour = hue_pal()(2)[2]) +
-  annotate("text", label = paste0("AUC = ", round(cv$paired$auc, 1), "%"), x = 35, y = 85, size = 5, colour = hue_pal()(2)[1]) +
+  annotate("text", label = cv$unpaired$auc, x = 75, y = 50, size = 3.5, colour = hue_pal()(2)[1]) +
+  annotate("text", label = cv$paired$auc, x = 35, y = 85, size = 3.5, colour = hue_pal()(2)[2]) +
   theme(legend.position = c(0.7, 0.15))
 
 ```
@@ -168,12 +173,11 @@ diabloPanel <- list(cells = c(selectVar(diablo, comp = 1)$cells$name,
 # paired
 diablow = block.splsda(X = A, Y = time, ncomp = ncomp, keepX = keepX, design = design)
 diablowPanel <- list(cells = c(selectVar(diablow, comp = 1)$cells$name, 
-                              selectVar(diablo, comp = 2)$cells$name),
+                              selectVar(diablow, comp = 2)$cells$name),
                            gene.module = c(selectVar(diablow, comp = 1)$gene.module$name,  
                                            selectVar(diablow, comp = 2)$gene.module$name),
                            metabolite.module = c(selectVar(diablow, comp = 1)$metabolite.module$name, 
                                                  selectVar(diablow, comp = 2)$metabolite.module$name))
-
 
 ```
 
@@ -205,7 +209,7 @@ p2 <- ggplot(dat, aes(x = `comp 1`, y = `comp 2`, group = time, color = time)) +
               xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
   xlab("Consensus Component 1") +
   ylab("Consensus Component 2") +
-  ggtitle("DIABLOw") +
+  ggtitle("mDIABLO") +
   theme(legend.position = "none") + 
   scale_color_manual(values=c("#388ECC", "#F68B33"))
 
@@ -225,23 +229,23 @@ diablowPanel_modif$gene.module[diablowPanel_modif$gene.module == "genMod-Tryptop
 panels <-  list(DIABLO_Cells = diabloPanel$cells, 
                    `DIABLO_Gene modules` = diabloPanel$gene.module, 
                    `DIABLO_Metabolite modules` = diabloPanel$metabolite.module,
-                   DIABLOw_Cells = diablowPanel_modif$cells, 
-                   `DIABLOw_Gene modules` = diablowPanel_modif$gene.module, 
-                   `DIABLOw_Metabolite modules` = diablowPanel_modif$metabolite.module)
+                   mDIABLO_Cells = diablowPanel_modif$cells, 
+                   `mDIABLO_Gene modules` = diablowPanel_modif$gene.module, 
+                   `mDIABLO_Metabolite modules` = diablowPanel_modif$metabolite.module)
 
-intersect(panels$`DIABLOw_Gene modules`, panels$`DIABLOw_Metabolite modules`)
+intersect(panels$`mDIABLO_Gene modules`, panels$`mDIABLO_Metabolite modules`)
 
 input <- fromList(panels)
 metadata <- data.frame(panels=names(panels),
-  type = c(rep("DIABLO", 3), rep("DIABLOw", 3)))
+  type = c(rep("DIABLO", 3), rep("mDIABLO", 3)))
 
 library(grid)
 
 #brewer.pal(2, "Pastel1")
 png(paste0(WhereAmI, "results/Figures/overlap.png"), width = 7, height = 4, units = 'in', res = 300)
 upset(input, sets = colnames(input), keep.order = TRUE,
-    queries = list(list(query = intersects, params = list("DIABLOw_Gene modules","DIABLOw_Metabolite modules"), active = TRUE, color = "maroon"),
-      list(query = intersects, params = list("DIABLOw_Gene modules","DIABLOw_Metabolite modules","DIABLO_Metabolite modules"), active = TRUE, color = "maroon")),
+    queries = list(list(query = intersects, params = list("mDIABLO_Gene modules","mDIABLO_Metabolite modules"), active = TRUE, color = "maroon"),
+      list(query = intersects, params = list("mDIABLO_Gene modules","mDIABLO_Metabolite modules","DIABLO_Metabolite modules"), active = TRUE, color = "maroon")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
     column = "type", colors = c(DIABLO = "#FBB4AE", DIABLOw = "#B3CDE3"), 
     alpha = 0.5))))
@@ -280,4 +284,3 @@ circosPlot(diablow, cutoff = 0.8, showIntraLinks = FALSE, size.variables = 1, si
 dev.off()
 
 ```
-
