@@ -23,6 +23,10 @@ library(amritr)
 library(tidyverse)
 library(mixOmics)
 library(NMF)
+library(RColorBrewer)
+library(cowplot)
+library(scales)
+library(UpSetR)
 
 ## load data
 load(paste0(WhereAmI, "data/asthmaDatasets.RDATA"))
@@ -31,6 +35,11 @@ cells <- cells[, c("Relative.Neutrophils","Relative.Lymphocytes","Relative.Monoc
   "Relative.Eosinophils","Relative.Basophils","Treg","Tcells","Bcells","Th17")]
 metExp <- metExp[apply(metExp, 1, mad) >0, ]
 rownames(metExp) <- metabolites[rownames(metExp), "BIOCHEMICAL"]
+
+## identify any overlapping gene and metabolite modules names
+colnames(gene.module)[colnames(gene.module) %in% intersect(colnames(gene.module), colnames(metabolite.module))] <- 
+  paste("genMod", colnames(gene.module)[colnames(gene.module) %in% intersect(colnames(gene.module), colnames(metabolite.module))], sep = "-")
+
 ```
 
 \pagebreak
@@ -70,133 +79,205 @@ p + scale_y_continuous(expression('Percent drop in '~ FEV[1])) + theme_bw() +
 ```{r, fig.height=10}
 X <- list(cells=cells, gene.module=gene.module, metabolite.module=metabolite.module)
 time <- demo$Time
-Cov <- data.frame(sample = rep(1:14, 2), stimul = time)
+Cov <- data.frame(sample = rep(1:14, 2), time = demo$Time)
 A = lapply(X, function(i) suppressMessages(withinVariation(X = i, design = Cov)))
 
 ## run DIABLO
 ncomp <- 2
 design <- matrix(1, nrow = 3, ncol = 3)
 diag(design) <- 0
-
-#test.keepX = list(Cells = 1:5, geneMods = 3:10, metMods = 3:10)
-#t1 <- proc.time()
-#tune.diablo_paired = tune.block.splsda(X = A, Y = time, ncomp = ncomp, test.keepX = test.keepX, 
-#                          dist = "centroids.dist",
-#                          design = design, validation = "loo")
-#t2 <- proc.time()
-#(t2-t1)/60 # 6.3 minutes
-#saveRDS(tune.diablo_paired, paste0(WhereAmI, "results/tune.diablo_paired.rds"))
-
-tune.diablo_paired <- readRDS(paste0(WhereAmI, "results/tune.diablo_paired.rds"))
-plot(tune.diablo_paired)
-tune.diablo_paired$choice.keepX
-tune.diablo_paired$error.rate %>% 
-  as.data.frame() %>% 
-  mutate(keepX = rownames(.)) %>% 
-  gather(comp, error, -keepX) %>% 
-  group_by(comp) %>% 
-  filter(error == min(error)) %>% 
-  slice(1)
 ```
 
 ## error rate of optimal keepX
-```{r}
-diablo_paired = block.splsda(X = A, Y = time, ncomp = ncomp,
-                            keepX = tune.diablo_paired$choice.keepX, design = design)
-diablo_pairedPanel <- list(cells = list(comp1=selectVar(diablo_paired, comp = 1)$cells$name, comp2=selectVar(diablo_paired, comp = 2)$cells$name),
-  gene.module = list(comp1=selectVar(diablo_paired, comp = 1)$gene.module$name, comp2=selectVar(diablo_paired, comp = 2)$gene.module$name),
-  metabolite.module = list(comp1=selectVar(diablo_paired, comp = 1)$metabolite.module$name, comp2=selectVar(diablo_paired, comp = 2)$metabolite.module$name))
 
-perf=perf(diablo_paired, validation="loo")
-perf$WeightedVote.error.rate
+```{r}
+keepX = list(cells = c(3, 3), gene.module = c(5, 5), metabolite.module = c(5, 5))
+ncomp = 2
+sample = rep(1:14, 2)
+time = demo$Time
+Y = time
+
+leave.one.out.cv = function(X, Y, ncomp, keepX, design, sample){
+  
+  averageVotes_unpaired <- averageVotes_paired <- list()
+
+  for(rm in 1 : length(unique(sample))){
+    sequence <- which(rm == sample)
+    trainX <- lapply(X, function(i) i[-sequence, ])
+    trainY <- Y[-sequence]
+    xtest <- lapply(X, function(i) i[sequence, ])
+	  xwtest <- lapply(X, function(i) i[sequence, ]-matrix(colMeans(i[sequence,]),ncol=ncol(i),nrow=length(sequence),byrow=TRUE))
+	  samplew <- sample[-sequence]
+    
+	  Cov <- data.frame(sample=samplew, stimu=trainY)
+	  trainXw <-  lapply(trainX, function(i){
+	    withinVariation(i, Cov)
+	  })
+
+	  ## unpaired diablo
+	  diablo_unpaired = block.splsda(X = trainX, Y = trainY, ncomp = ncomp, keepX = keepX, design = design)
+    test_unpaired = predict(diablo_unpaired, xtest, method = "all")
+	  averageVotes_unpaired[[rm]] <- test_unpaired$AveragedPredict[,,2][,1]
+	  
+	  ## paired diablo
+	  diablo_paired = block.splsda(X = trainXw, Y = trainY, ncomp = ncomp, keepX = keepX, design = design)
+    test_paired = predict(diablo_paired, xwtest, method = "all")
+	  averageVotes_paired[[rm]] <- test_paired$AveragedPredict[,,2][,1]
+  }
+  avgVote <-  list(unpaired = unlist(averageVotes_unpaired), paired=unlist(averageVotes_paired))
+  avgVote <- lapply(avgVote, function(i){
+    roc.score = roc(response = sapply(strsplit(names(unlist(averageVotes_unpaired)), "\\."), function(i) i[3]), predictor = i, plot = FALSE, percent = TRUE, na.rm =TRUE)
+    roc.res = data.frame(Specificity = rev(roc.score$specificities), Sensitivity = rev(roc.score$sensitivities))
+    roc.res$fp = 100 - as.numeric(roc.res$Specificity)
+    roc.res$tp = as.numeric(roc.res$Sensitivity)
+    auc=roc.score$auc
+    return(list(roc.res=roc.res, auc=auc))
+  })
+avgVote
+}
+
+cv <- leave.one.out.cv(X, Y, ncomp, keepX, design, sample)
+
+aucPlot <- rbind(cv$unpaired$roc.res, cv$paired$roc.res) %>% 
+  mutate(Time = c(rep("DIABLO", nrow(cv$unpaired$roc.res)), rep("DIABLOw", nrow(cv$paired$roc.res)))) %>% 
+  ggplot(aes(x = fp, y = tp, fill = Time, color = Time)) +
+  geom_abline(intercept = 0, slope = 1, col = "gray", linetype="dashed")  +
+  geom_point() +
+  geom_line() +
+  customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, 
+    vjust = 0.5, xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
+  xlab("100 - Specificity") + ylab("Sensitivity") +
+  annotate("text", label = paste0("AUC = ", round(cv$unpaired$auc, 1), "%"), x = 75, y = 50, size = 5, colour = hue_pal()(2)[2]) +
+  annotate("text", label = paste0("AUC = ", round(cv$paired$auc, 1), "%"), x = 35, y = 85, size = 5, colour = hue_pal()(2)[1]) +
+  theme(legend.position = c(0.7, 0.15))
+
 ```
 
-## AUC
+## diablo - unpaired and paired
 
 ```{r}
-time <- relevel(demo$Time, ref = "pre")
-names(time) <- rownames(demo)
-predictScores <- lapply(perf$predict$nrep1 %>% amritr::zip_nPure(), function(i){
-  Reduce("+", i)/length(i)
-})
-all(rownames(predictScores) == names(time))
+# unpaired
+diablo = block.splsda(X = X, Y = time, ncomp = ncomp, keepX = keepX, design = design)
+diabloPanel <- list(cells = c(selectVar(diablo, comp = 1)$cells$name, 
+                              selectVar(diablo, comp = 2)$cells$name),
+                           gene.module = c(selectVar(diablo, comp = 1)$gene.module$name,  
+                                           selectVar(diablo, comp = 2)$gene.module$name),
+                           metabolite.module = c(selectVar(diablo, comp = 1)$metabolite.module$name, 
+                                                 selectVar(diablo, comp = 2)$metabolite.module$name))
 
-roc.score = roc(response = as.character(time), predictor = predictScores$`comp 2`[, "post"], plot = TRUE, percent = TRUE, na.rm =TRUE)
-roc.res = data.frame(Specificity = rev(roc.score$specificities), Sensitivity = rev(roc.score$sensitivities))
-roc.res$Specificity = 100 - as.numeric(roc.res$Specificity)
-roc.res$Sensitivity = as.numeric(roc.res$Sensitivity)
-roc.score$auc
+# paired
+diablow = block.splsda(X = A, Y = time, ncomp = ncomp, keepX = keepX, design = design)
+diablowPanel <- list(cells = c(selectVar(diablow, comp = 1)$cells$name, 
+                              selectVar(diablo, comp = 2)$cells$name),
+                           gene.module = c(selectVar(diablow, comp = 1)$gene.module$name,  
+                                           selectVar(diablow, comp = 2)$gene.module$name),
+                           metabolite.module = c(selectVar(diablow, comp = 1)$metabolite.module$name, 
+                                                 selectVar(diablow, comp = 2)$metabolite.module$name))
+
+
 ```
 
 # Component plots
 
 ```{r}
-as.data.frame(Reduce("+", diablo_paired$variates)/length(X)) %>% 
-  mutate(time = time) %>% 
-  ggplot(aes(x = `comp 1`, y = `comp 2`, group = time, color = time)) +
+dat <- as.data.frame(Reduce("+", diablo$variates)/length(X)) %>% 
+  mutate(time = time, sample = factor(sample))
+p1 <- ggplot(dat, aes(x = `comp 1`, y = `comp 2`, group = time, color = time)) +
   geom_point(size = 4) +
   stat_ellipse() +
+  geom_line(aes(group = sample), color = "gray")+
   customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
+              xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
   xlab("Consensus Component 1") +
-  ylab("Consensus Component 2")
+  ylab("Consensus Component 2") +
+  ggtitle("DIABLO") +
+  theme(legend.position = c(0.1, 0.9)) + 
+  scale_color_manual(values=c("#388ECC", "#F68B33"))
+  
+
+dat <- as.data.frame(Reduce("+", diablow$variates)/length(X)) %>% 
+  mutate(time = time, sample = factor(sample))
+p2 <- ggplot(dat, aes(x = `comp 1`, y = `comp 2`, group = time, color = time)) +
+  geom_point(size = 4) +
+  stat_ellipse() +
+  geom_line(aes(group = sample), color = "gray")+
+  customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
+              xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
+  xlab("Consensus Component 1") +
+  ylab("Consensus Component 2") +
+  ggtitle("DIABLOw") +
+  theme(legend.position = "none") + 
+  scale_color_manual(values=c("#388ECC", "#F68B33"))
+
+pdf(paste0(WhereAmI, "results/Figures/auc_componentPlot.pdf"), width = 13, height = 4)
+plot_grid(aucPlot, p1, p2, ncol = 3)
+dev.off()
+
+```
+
+## compare multi-omic panels
+
+```{r}
+diablowPanel_modif <- diablowPanel
+diablowPanel_modif$gene.module[diablowPanel_modif$gene.module == "Valine, leucine and isoleucine biosynthesis"] <- "Valine, leucine and isoleucine metabolism"
+diablowPanel_modif$gene.module[diablowPanel_modif$gene.module == "genMod-Tryptophan metabolism"] <- "Tryptophan metabolism"
+
+panels <-  list(DIABLO_Cells = diabloPanel$cells, 
+                   `DIABLO_Gene modules` = diabloPanel$gene.module, 
+                   `DIABLO_Metabolite modules` = diabloPanel$metabolite.module,
+                   DIABLOw_Cells = diablowPanel_modif$cells, 
+                   `DIABLOw_Gene modules` = diablowPanel_modif$gene.module, 
+                   `DIABLOw_Metabolite modules` = diablowPanel_modif$metabolite.module)
+
+intersect(panels$`DIABLOw_Gene modules`, panels$`DIABLOw_Metabolite modules`)
+
+input <- fromList(panels)
+metadata <- data.frame(panels=names(panels),
+  type = c(rep("DIABLO", 3), rep("DIABLOw", 3)))
+
+library(grid)
+
+#brewer.pal(2, "Pastel1")
+png(paste0(WhereAmI, "results/Figures/overlap.png"), width = 7, height = 4, units = 'in', res = 300)
+upset(input, sets = colnames(input), keep.order = TRUE,
+    queries = list(list(query = intersects, params = list("DIABLOw_Gene modules","DIABLOw_Metabolite modules"), active = TRUE, color = "maroon"),
+      list(query = intersects, params = list("DIABLOw_Gene modules","DIABLOw_Metabolite modules","DIABLO_Metabolite modules"), active = TRUE, color = "maroon")),
+  set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
+    column = "type", colors = c(DIABLO = "#FBB4AE", DIABLOw = "#B3CDE3"), 
+    alpha = 0.5))))
+dev.off()
+
 
 ```
 
 # heatmap
 
-```{r, fig.height=10}
-cimDiablo(diablo_paired, margins = c(25, 5), comp = 1)
-```
-
-> the above heatmap shows cells as an individula feature name
-
-```{r, fig.height=10}
-comp <- rep(sapply(strsplit(names(rapply(diablo_pairedPanel, length)), "\\."), function(i) i[length(i)]),
-  rapply(diablo_pairedPanel, length))
-X <- as.data.frame(do.call(cbind, A))[, unlist(diablo_pairedPanel)]
-X <- scale(X)
-X[which(X < -2)] <- -2
-X[which(X > 2)] <- 2
-aheatmap(X, annCol = list(comp=comp), annRow = list(time=time, response=demo$Response))
-
-```
-
-
-# Circos plot
-
->Error in `row.names<-.data.frame`(`*tmp*`, value = value) : invalid 'row.names' length
-
 ```{r, fig.height=7, fig.width=7}
-#circosPlot(diablo_paired, cutoff = 0.7)
+corMat <- mapply(function(x, y){
+  x[, unique(y)]
+}, x = A, y = diablowPanel) %>% 
+  do.call(cbind, .) %>% 
+  cor
+
+color.blocks = brewer.pal(n = 12, name = "Set2")[1:3]
+row.sideColors = rep(color.blocks, sapply(lapply(diablowPanel, unique), length))
+col.sideColors = row.sideColors
+
+pdf(paste0(WhereAmI, "results/Figures/varCor.pdf"), width = 15, height = 15)
+cim(corMat, margins = c(35, 35), row.cex = 2, col.cex = 2, 
+  row.sideColors=row.sideColors, col.sideColors=col.sideColors)
+legend("topright", names(diablowPanel), col = color.blocks, pch = 19, bty = "n", cex = 2)
+dev.off()
+
+
 ```
 
-## network
+# circosplot
 
 ```{r}
-library(annotate)
-library("hugene10sttranscriptcluster.db")
-
-cells_asthma <- cells[, unlist(diablo_pairedPanel$cells)]
-genes_asthma <- subset(genDat, Mod %in%  as.character(unlist(diablo_pairedPanel$gene.module))) %>% 
-  mutate(genSym = getSYMBOL(sapply(strsplit(rownames(.), "\\."), function(i) i[1]), "hugene10sttranscriptcluster"))
-genes_mapper <- split(as.character(genes_asthma$genSym), genes_asthma$Mod)
-genes_asthma <- genes_asthma %>% 
-  dplyr::select(-Mod) %>% 
-  dplyr::group_by(genSym) %>% 
-  dplyr::slice(1) %>% 
-  as.data.frame()
-metabolties_asthma <- metabolites[metabolites$SUB_PATHWAY %in% unlist(diablo_pairedPanel$metabolite.module), ]
-rownames(metabolties_asthma) <- metabolties_asthma$BIOCHEMICAL
-
-cells_mapper <- list(Monocytes = "Relative.Monocytes", Lymphocytes = "Relative.Lymphocytes")
-metabolties_mapper <- split(as.character(metabolties_asthma$BIOCHEMICAL), factor(as.character(metabolties_asthma$SUB_PATHWAY)))
-
-cellsExp <- A$cells[, unlist(cells_mapper)]
-genesExp0 <- subset(genes_asthma, genSym %in% unique(unlist(genes_mapper)))
-genesExp <- as.matrix(genesExp0[, -ncol(genesExp0)])
-rownames(genesExp) <- genesExp0$genSym
-
+pdf(paste0(WhereAmI, "results/Figures/circosPlot.pdf"), width = 15, height = 15)
+circosPlot(diablow, cutoff = 0.8, showIntraLinks = FALSE, size.variables = 1, size.labels = 2, size.legend = 2, color.blocks = color.blocks)
+dev.off()
 
 ```
 
