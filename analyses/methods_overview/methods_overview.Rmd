@@ -1,0 +1,155 @@
+---
+title: "Methods overview"
+bibliography: /Users/asingh/Dropbox/Manuscript/diablo/mybib.bib
+thanks: "Replication files are available at https://github.com/singha53/diablo"
+output:
+  html_document:
+    toc: yes
+    theme: united
+    highlight: tango
+    keep_md: yes
+biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE)
+
+WhereAmI <- "/Users/asingh/Dropbox/Manuscript/diablo/analyses/methods_overview/"
+
+
+# laod libraries
+library(igraph)
+```
+
+# list of all methods
+
+```{r}
+## methods for single data anlaysis
+pca <- c("Unsupervised", "Single-data","Multi-data","Concatenation", "No variable selection", "Component-based", "N-integration")
+spca <- c("Unsupervised", "Single-data","Multi-data","Concatenation", "Variable selection", "Component-based", "N-integration")
+nmf <- c("Unsupervised", "Single-data","Multi-data","Concatenation", "No variable selection", "Component-based", "N-integration")
+mds <- c("Unsupervised", "Single-data","Multi-data","Concatenation", "No variable selection", "Component-based", "N-integration")
+tsne <- c("Unsupervised", "Single-data","Multi-data","Concatenation", "No variable selection", "N-integration", "N-integration") 
+splsda <- c("Supervised", "Single-data","Multi-data", "PLS","Concatenation","Ensemble","Classification", "Variable selection", "Component-based", "N-integration")
+glmnet <- c("Supervised", "Single-data","Multi-data","Concatenation","Ensemble","Classification","Regression", "Variable selection", "penalized generalized linear model", "N-integration")
+gelnet <- c("Supervised", "Single-data","Multi-data","Concatenation","Ensemble","Classification","Regression", "Variable selection", "penalized generalized linear model","Network", "N-integration")
+rf <- c("Supervised", "Single-data","Multi-data","Concatenation","Ensemble","Classification","Regression", "No variable selection", "tree-based", "N-integration")
+svm <- c("Supervised","Single-data","Multi-data","Concatenation","Ensemble","Classification","Regression", "No variable selection", "N-integration")
+wgcna <- c("Unsupervised", "Single-data","Multi-data","Concatenation","clusters of features","Clustering", "Network", "N-integration")
+
+
+## integrative methods
+sgcca <- c("Unsupervised", "Multi-data", "Variable selection", "Component-based", "GCCA", "Multiblock", "diablo", "N-integration")
+rgcca <- c("Unsupervised", "Multi-data", "No variable selection", "Component-based", "GCCA", "Multiblock", "N-integration") 
+mfa <- c("Unsupervised", "Multi-data", "No variable selection", "Component-based", "Multiblock", "N-integration") 
+mcia <- c("Unsupervised", "Multi-data", "No variable selection", "Component-based", "Multiblock", "N-integration")
+mofa <- c("Unsupervised", "Multi-data", "Variable selection", "Component-based", "Bayesian", "N-integration")
+rimbanet <- c("Unsupervised", "Multi-data", "No variable selection", "Bayesian", "Network", "N-integration")
+jointnmf <- c("Unsupervised", "Multi-data", "No variable selection", "Component-based", "NMF", "N-integration")
+snmnmf <- c("Unsupervised", "Multi-data", "Variable selection", "Component-based", "NMF", "N-integration")
+iclusterplus <- c("Unsupervised", "Multi-data", "Variable selection", "Component-based", "Clustering", "N-integration")
+jive <- c("Unsupervised", "Multi-data", "Variable selection", "Component-based", "N-integration")
+smbpls <- c("Unsupervised", "Multi-data", "Variable selection", "Component-based","Regression", "N-integration")
+bcc <- c("Unsupervised", "Multi-data", "Bayesian", "No variable selection", "clusters of samples", "N-integration")
+snf <- c("Unsupervised", "Multi-data", "Message passing", "No variable selection", "clusters of samples", "Clustering", "N-integration")
+rmkl_lpp <- c("Unsupervised", "Multi-data", "Multiple kernel learning", "No variable selection", "Clustering", "N-integration")
+athena <- c("Supervised", "Multi-data", "Grammatical Evolution Neural Networks", "Variable selection", "Classification", "N-integration")
+ibag <- c("Supervised", "Multi-data", "Bayesian", "No variable selection", "Classification","Regression", "N-integration")
+diablo <- c("Supervised", "Multi-data", "Component-based", "Variable selection", "Classification","Regression", "sgcca", "N-integration")
+smsma <- c("Supervised", "Unsupervised", "Multi-data", "Component-based", "Variable selection", "Classification","Regression", "N-integration")
+
+## 2-datatypes
+rcca <- c("Unsupervised", "2-datasets", "GCCA", "No variable selection", "Component-based", "N-integration")
+spls <- c("Unsupervised", "2-datasets", "PLS", "Variable selection", "Component-based", "N-integration")
+pls <- c("Unsupervised", "2-datasets", "PLS", "No variable selection", "Component-based", "N-integration")
+stsvm <- c("Supervised","up to 2 datasets","Classification","Regression", "Variable selection", "Network", "N-integration")
+
+
+links <- data.frame(from = rep(c("PCA","sPCA","NMF","MDS","tSNE","sPLSDA","glmnet","gelnet","RF","SVM","WGCNA",
+                               "sGCCA","rGCCA","MFA","MCIA","MOFA","RIMBANET","jointNMF","SNMNMF","iClusterPlus","JIVE","sMBPLS","BCC","SNF","RMKL-LPP","ATHENA","iBAG","DIABLO","SMSMA",
+  "RGCCA","sPLS","PLS","stSVM"), c(length(pca),length(spca),length(nmf),length(mds),length(tsne),length(splsda),length(glmnet),length(gelnet),length(rf),length(svm),length(wgcna),length(sgcca),length(rgcca),length(mfa),length(mcia),length(mofa),length(rimbanet),length(jointnmf),length(snmnmf),length(iclusterplus),length(jive),length(smbpls),length(bcc),length(snf),length(rmkl_lpp),length(athena),length(ibag),length(diablo),length(smsma),length(rcca),length(spls),length(pls),length(stsvm))),
+  to=c(pca,spca,nmf,mds,tsne,splsda,glmnet,gelnet,rf,svm,wgcna,sgcca,rgcca,mfa,mcia,mofa,rimbanet,jointnmf,snmnmf,iclusterplus,jive,smbpls,bcc,snf,rmkl_lpp,athena,ibag,diablo,smsma,rcca,spls,pls,stsvm))
+nodes <- data.frame(id=unique(as.character(as.matrix(links))))
+
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=FALSE) 
+plot(net, layout=layout_with_kk)   
+
+
+
+```
+
+```{r}
+## methods for single data anlaysis
+pca <- c("Concatenation","Component-based")
+nmf <- c("Concatenation", "Component-based")
+tsne <- c("Concatenation") 
+splsda <- c("Concatenation","Ensemble","Component-based")
+glmnet <- c("Concatenation","Ensemble")
+gelnet <- c("Concatenation","Ensemble","Network-based","glmnet")
+rf <- c("Concatenation","Ensemble")
+svm <- c("Concatenation","Ensemble")
+wgcna <- c("Concatenation","Clustering", "Network-based")
+
+
+## integrative methods
+sgcca <- c("Component-based")
+rgcca <- c("Component-based") 
+mfa <- c("Component-based") 
+mcia <- c("Component-based")
+mofa <- c("Component-based", "Bayesian")
+rimbanet <- c("Bayesian", "Network-based")
+jointnmf <- c("Component-based", "NMF")
+snmnmf <- c("Component-based", "NMF", "jointNMF")
+iclusterplus <- c("Component-based", "Clustering")
+jive <- c("Component-based")
+smbpls <- c("Component-based")
+bcc <- c("Bayesian", "Clustering")
+snf <- c("Message passing", "Clustering")
+rmkl_lpp <- c("MKL", "Clustering")
+athena <- c("GENN","Network-based")
+ibag <- c("Bayesian")
+diablo <- c("Component-based", "sGCCA")
+
+links <- data.frame(from=c(pca,nmf,tsne,splsda,glmnet,gelnet,rf,svm,wgcna,sgcca,rgcca,mfa,mcia,mofa,rimbanet,jointnmf,snmnmf,iclusterplus,jive,smbpls,bcc,snf,rmkl_lpp,athena,ibag,diablo),
+  to = rep(c("PCA","NMF","tSNE","sPLSDA","glmnet","gelnet","RF","SVM","WGCNA",
+                               "sGCCA","rGCCA","MFA","MCIA","MOFA","RIMBANET","jointNMF","SNMNMF","iClusterPlus","JIVE","sMBPLS","BCC","SNF","RMKL-LPP","ATHENA","iBAG","DIABLO"), c(length(pca),length(nmf),length(tsne),length(splsda),length(glmnet),length(gelnet),length(rf),length(svm),length(wgcna),length(sgcca),length(rgcca),length(mfa),length(mcia),length(mofa),length(rimbanet),length(jointnmf),length(snmnmf),length(iclusterplus),length(jive),length(smbpls),length(bcc),length(snf),length(rmkl_lpp),length(athena),length(ibag),length(diablo))))
+nodes <- data.frame(id=unique(as.character(as.matrix(links))))
+links$col <- links$edge.lty <- rep("gray50")
+links$col[links$from %in% "Component-based"] <- "blue"
+links$edge.lty <- rep("solid")
+links$edge.lty [links$from %in% "Component-based"] <- "dashed"
+links$edge.width <- 1
+links$edge.width [links$from %in% "Component-based"] <- 2.2
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=FALSE) 
+E(net)$color <- links$col
+E(net)$lty <- links$edge.lty
+E(net)$width <- links$edge.width
+
+mark.groups <- list("JIVE","MOFA","sGCCA",
+                    "DIABLO",c("Concatenation","sPLSDA"),c("Ensemble","sPLSDA"))
+mark.col <- rep(rainbow(1, alpha=.5), length(mark.groups))
+
+
+vertex.label.color <- rep("black", nrow(nodes))
+vertex.label.color[nodes$id %in% c("sPLSDA","glmnet","gelnet","sGCCA","MOFA","SNMNMF","iClusterPlus","JIVE","sMBPLS","DIABLO","ATHENA")] <- "#6A3D9A"
+vertex.label.color[nodes$id %in% c("WGCNA","SVM","RF","tSNE","RMKL-LPP","RIMBANET","BCC","SNF","MFA","jointNMF","rGCCA","PCA",
+  "NMF","MCIA","iBAG")] <- "#E31A1C"
+vertex.shape <- rep("none", nrow(nodes))
+vertex.shape[!(nodes$id %in% c("Clustering","Ensemble", "Concatenation"))] <- "circle"
+vertex.shape[nodes$id %in% c("Component-based", "Network-based", "Bayesian", "MKL", "Message passing", "GENN")] <- "sphere"
+vertex.color <- rep("white", nrow(nodes))
+vertex.color[nodes$id %in% c("PCA","NMF","tSNE","WGCNA","sGCCA","rGCCA","MFA","MCIA","MOFA","RIMBANET","jointNMF","SNMNMF",
+  "iClusterPlus","JIVE","sMBPLS","BCC","SNF","RMKL-LPP")] <- "#E5F5E0"
+vertex.color[nodes$id %in% c("sPLSDA","glmnet","gelnet","ATHENA","DIABLO","iBAG","RF","SVM")] <- "#A1D99B"
+vertex.label.font <- rep(1, nrow(nodes))
+vertex.label.font[nodes$id %in% c("Message passing","Component-based","Bayesian","Network-based","GENN","MKL")] <- 2
+vertex.size <- rep(16, nrow(nodes))
+vertex.size[nodes$id %in% c("Message passing","Component-based","Bayesian","Network-based","GENN","MKL")] <- 13
+
+pdf(paste0(WhereAmI, "methodsOverview_network.pdf"), width=12, height=12)
+plot(net, layout=layout_with_lgl, vertex.shape=vertex.shape,vertex.color=vertex.color,vertex.label.color=vertex.label.color,
+  vertex.label.font=2,vertex.size =vertex.size,mark.groups=mark.groups,mark.col=mark.col)
+dev.off()
+
+
+
+```
