@@ -36,9 +36,9 @@ library(ggraph)
 source(paste0(WhereAmI, "src/functions_connectivity_biologicalEnrichment.R"))
 
 ## load data
-load(paste0(WhereAmI, "data/SNFdatasets.RDATA"))
-load(paste0(WhereAmI, "data/jive/jive_SNFdatasets.RDATA"))
-load(paste0(WhereAmI, "data/mofa/mofa_SNFdatasets.RDATA"))
+load("~/Dropbox/Manuscript/diablo_datasets/benchmarking/SNFdatasets.RDATA")
+load("~/Dropbox/Manuscript/diablo_datasets/benchmarking/jive/jive_SNFdatasets.RDATA")
+load("~/Dropbox/Manuscript/diablo_datasets/benchmarking/mofa/mofa_SNFdatasets.RDATA")
 ```
 
 # SNF data description
@@ -293,7 +293,7 @@ multiOmicPanels <- list(JIVE = snf_jive$panel, MOFA = snf_mofa$panel, sGCCA = sn
 allPanels <- list(JIVE = snf_jive$panel, MOFA = snf_mofa$panel, sGCCA = snf_sgcca$panel,
                   Concatenation = snf_concat_splsda$panel, Ensemble = snf_ensemble_splsda$panel, 
                   DIABLO_null = snf_diabloNull$panel, DIABLO_full = snf_diabloFull$panel) %>% rapply(., function(i){
-                    sapply(strsplit(i, "_"), function(j) j[[2]])
+                    sapply(strsplit(as.character(i), "_"), function(j) as.character(j[[2]]))
                   }, how = "list")
 
 panels <- rapply(multiOmicPanels, function(i){
@@ -397,7 +397,7 @@ metadata$type[metadata$approaches %in% c("JIVE","sGCCA","MOFA")] <- "unsupervise
 png(paste0(WhereAmI, "results/Figures/colon_overlap.png"), width = 7, height = 3.5, units = 'in', res = 300)
 upset(colonInput, sets = colnames(colonInput), keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
-      list(query = intersects, params = list("JIVE","MOFA","sGCCA"), active = TRUE, color = "#F0E442")),
+      list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
     column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
     alpha = 0.5))))
@@ -432,7 +432,7 @@ metadata$type[metadata$approaches %in% c("JIVE","sGCCA","MOFA")] <- "unsupervise
 png(paste0(WhereAmI, "results/Figures/kidney_overlap.png"), width = 7, height = 3.5, units = 'in', res = 300)
 upset(kidneyInput, sets = colnames(kidneyInput),  keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
-      list(query = intersects, params = list("JIVE","MOFA","sGCCA"), active = TRUE, color = "#F0E442")),
+      list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
     column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
     alpha = 0.5))))
@@ -466,7 +466,7 @@ metadata$type[metadata$approaches %in% c("JIVE","sGCCA","MOFA")] <- "unsupervise
 png(paste0(WhereAmI, "results/Figures/gbm_overlap.png"), width = 7, height = 3.5, units = 'in', res = 300)
 upset(gbmInput, sets = colnames(gbmInput), keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
-      list(query = intersects, params = list("JIVE","MOFA","sGCCA"), active = TRUE, color = "#F0E442")),
+      list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
     column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
     alpha = 0.5))))
@@ -500,7 +500,7 @@ metadata$type[metadata$approaches %in% c("JIVE","sGCCA","MOFA")] <- "unsupervise
 png(paste0(WhereAmI, "results/Figures/lung_overlap.png"), width = 7, height = 3.5, units = 'in', res = 300)
 upset(lungInput, sets = colnames(lungInput), keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
-      list(query = intersects, params = list("JIVE","MOFA","sGCCA"), active = TRUE, color = "#F0E442")),
+      list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
     column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
     alpha = 0.5))))
@@ -559,25 +559,41 @@ enrichedPathways %>%
 ### which method is leads to the greatest number of signficant pathways?
 
 ```{r}
-enrichedPathways %>% group_by(collection, disease) %>% 
-  dplyr::filter(sig == max(sig)) %>% 
+enrichedPathways %>% 
+  group_by(disease, collection) %>% 
+  nest() %>% 
+  mutate(method = purrr::map(data, ~{
+    topMethod <- as.character(as.matrix(.[.$sig == max(.$sig), "method"]))
+    ifelse(length(topMethod) == 1, topMethod, "tie")
+  })) %>% 
   dplyr::select(disease, collection, method) %>% 
-  dplyr::group_by(disease, collection) %>% 
-  dplyr::summarise(method = paste(as.character(method), collapse = " & ")) %>% 
-  ungroup %>% 
-  group_by(method) %>% 
-   dplyr::summarise(n_sig = n()) %>% 
-  as.data.frame()
+  unnest() %>% 
+  as.data.frame() %>% 
+  group_by(disease, method) %>% 
+  summarise(n=n()) %>% 
+  ggplot(aes(x = disease, y = n, fill = method, color = method)) +
+  geom_bar(stat = "identity", position = "dodge")
 
-enrichedPathways %>% group_by(type, disease, collection) %>% 
-  dplyr::filter(sig == max(sig)) %>% 
-  dplyr::select(type, disease, collection, method) %>% 
-  dplyr::group_by(type, disease, collection) %>% 
-  dplyr::summarise(method = paste(as.character(method), collapse = " & ")) %>% 
-  ungroup %>% 
-  group_by(type, method) %>% 
-   dplyr::summarise(n_sig = n()) %>% 
-  as.data.frame()
+
+
+enrichedPathways %>% 
+  group_by(disease, collection) %>% 
+  nest() %>% 
+  mutate(method = purrr::map(data, ~{
+    data.frame(method = .$method, 
+               rank = rank(.$sig, ties.method="max")-min(rank(.$sig, ties.method="max")))
+  })) %>% 
+  dplyr::select(disease, collection, method) %>% 
+  unnest() %>% 
+  as.data.frame() %>% 
+  group_by(disease, method) %>% 
+  ggplot(aes(x = disease, y = rank, fill = method, color = method)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~collection) +
+  customTheme(sizeStripFont = 15, xAngle = 40, hjust = 1, vjust = 1, 
+    xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
+
+
 
 ```
 
@@ -732,7 +748,7 @@ df$clusters <- purrr::map(df$net, igraph::cluster_edge_betweenness)
 
 df$ggraphs <- pmap(list(c = df$clusters, g = df$net) , function(c, g) {
   V(g)$community <- as.character(c$membership)
-  V(g)$block <- gsub('^(.+)_.+$', '\\1', V(g)$name)
+  V(g)$block <- sapply(strsplit(V(g)$name, "_"), function(i) i[1])
   ggraph(g, layout = 'igraph', algorithm = 'nicely') +
     # geom_edge_fan(colour = 'lightgrey', show.legend = FALSE) +
     geom_encircle(aes(x = x, y = y, group = community),
