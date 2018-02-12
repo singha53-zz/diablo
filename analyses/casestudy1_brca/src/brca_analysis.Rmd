@@ -32,7 +32,7 @@ library(ggalt)
 library(RColorBrewer)
 
 ## load data
-load(paste0(WhereAmI, "data/trainTestDatasetsNormalized.RDATA"))
+load("~/Dropbox/Manuscript/diablo_datasets/brca/trainTestDatasetsNormalized.RDATA")
 ```
 
 \pagebreak
@@ -65,9 +65,9 @@ test.keepX = list(mRNA = c(5, 10, 15, 20), miRNA = c(5, 10, 15, 20), CpGs = c(5,
 #                          design = design, validation = "Mfold", folds = 5, nrepeat = 5, cpus = 5)
 #t2 <- proc.time()
 #(t2-t1)/60 # 77.3640000 minutes
-#saveRDS(tune, "~/Dropbox/Manuscript/mixOmics_org_DIABLO/casestudy_brca/data/brcaPanel_tune.rds")
+#saveRDS(tune, "~/Dropbox/Manuscript/diablo_datasets/brca/brcaPanel_tune.rds")
 
-tune <- readRDS(paste0(WhereAmI, "data/brcaPanel_tune.rds"))
+tune <- readRDS("~/Dropbox/Manuscript/diablo_datasets/brca/brcaPanel_tune.rds")
 ```
 
 ## Component 1

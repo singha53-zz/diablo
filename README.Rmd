@@ -18,7 +18,7 @@ knitr::opts_chunk$set(out.width = '100%', dpi=300)
 
 # Table of contents
 
-## 1) [Multi-omics methods overview]()
+## 1) [Multi-omics methods overview](https://github.com/singha53/diablo/tree/master/analyses/methods_overview)
 * Describe types of multi-omic methods (unsupervised and supervised methods and variable selection (yes/no))
   
 ## 2) [Simulation Study](https://github.com/singha53/diablo/blob/master/analyses/simulation_study/src/simulation_study.md)
@@ -39,7 +39,7 @@ knitr::opts_chunk$set(out.width = '100%', dpi=300)
 * show ability of DIABLO to uncover features (as part of the multi-omic biomarker signature) already associated with breast cancer
 * demonstrate possible visualizations with DIABLO models
 
-## 5) [Case study 2: Asthma - Incoporation of other features (module-based analysis, cross-over study design) with the DIABLO framework]()
+## 5) [Case study 2: Asthma - Incoporation of other features (module-based analysis, cross-over study design) with the DIABLO framework](https://github.com/singha53/diablo/blob/master/analyses/casestudy2_asthma/src/asthma_analysis.md)
 * describe module-based analysis and how to model cross-over study designs
 * compare features selected using paired vs. unpaired approach
 * explain biological insights
