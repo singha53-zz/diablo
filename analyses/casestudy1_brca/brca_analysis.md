@@ -1,13 +1,10 @@
 ---
 title: "Case study 1: Breast cancer"
-thanks: "Replication files are available at https://github.com/singha53/diablo"
 output:
-  rmdformats::readthedown:
-    self_contained: true
-    thumbnails: true
-    lightbox: true
-    gallery: false
-    highlight: tango
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: true
     keep_md: yes
 ---
 
