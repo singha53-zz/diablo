@@ -11,6 +11,9 @@ output:
 
 
 
+![Contributors](https://github.com/singha53/diablo/blob/master/analyses/methods_overview/Figure1_asEdit.png)
+
+
 # Table of contents
 
 ## 1) [Multi-omics methods overview](https://github.com/singha53/diablo/blob/master/analyses/methods_overview/methods.md)
