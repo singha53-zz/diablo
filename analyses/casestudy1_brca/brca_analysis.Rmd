@@ -1,13 +1,16 @@
 ---
 title: "Case study 1: Breast cancer"
 output:
-  html_document:
-    keep_md: yes
-    toc: true
+  rmdformats::readthedown:
+  self_contained: true
+  lightbox: true
+  gallery: false
+  highlight: tango
+  keep_md: yes
+  toc: true
 ---
 
 ```{r setup, include=FALSE}
-#knitr::opts_knit$set(root.dir = '~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/results/')
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE)
 
 WhereAmI <- "~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/"
@@ -134,7 +137,7 @@ plot_grid(p1, p2, p3, ncol = 3)
 
 ## Optimal DIABLO model
 
-```{r}
+```{r, results='hide'}
 ## check rownames ordering
 all(rownames(tune$error.rate) == rownames(tune$error.rate.sd))
 ```
@@ -299,7 +302,7 @@ plot_grid(p1, p2, p3, p4, ncol = 2)
 
 ## Evaluate performance of diablo panel using additional data (test datasets)
 
-```{r}
+```{r, results='hide'}
 ## Training data
 Y.train <- droplevels(pam50Train0$Call)
 names(Y.train) <- rownames(pam50Train0)
@@ -328,6 +331,8 @@ rbind(table(Y.train), table(Y.test)) %>%
   mutate(Set = c("Train", "Test"))
 ```
 
+## Individual class error rate per PAM50 subtype
+
 ```{r}
 ## build diablo model and test on independent dataset
 pred <- predict(diablo, X.test, dist = "all")
@@ -345,9 +350,9 @@ rownames(TestError) <- c(levels(Y.test), "Overall.ER", "Overall.BER")
 TestError[, "comp3"]
 ```
 
-# DIABLO (Sample plots)
+## Component plots
 
-```{r, fig.height=5, fig.width=13}
+```{r SamplePlots_trainEllipses_testPoints, fig.path='Figures/', dev='png', fig.height=13, fig.width=10}
 # model variates
 varDat.train <- do.call(rbind, diablo$variates[1:length(X.train)]) %>% 
   as.data.frame %>% mutate(subj = rownames(.))
@@ -396,26 +401,18 @@ p2 <- filter(varDat.test, Dataset != "Consensus") %>%
   theme(strip.text.x = element_text(size=26, face = "bold")) + 
   scale_color_manual(values=color.mixo(1:4))
 
-pdf(paste0(WhereAmI, "results/Figures/SamplePlots_trainEllipses_testPoints.pdf"), height = 13, width = 10)
 plot_grid(p1, p2, ncol=1) 
-dev.off()
-
-
 ```
 
-## heatmap
+## Heatmap
 
-```{r}
-pdf(paste0(WhereAmI, "results/Figures/heatmap_brca.pdf"), height = 10, width = 8)
+```{r heatmap_brca, fig.path='Figures/', dev='png', fig.height=10, fig.width=8}
 cimDiablo(diablo, row.names = FALSE, col.names = FALSE)
-dev.off()
-
-
 ```
 
-# network
+## Network
 
-```{r}
+```{r network_brca, fig.path='Figures/', dev='png', fig.height=8, fig.width=8}
 corMat <- mapply(function(x, y){
   y[, x]
 }, x = diabloPanel, y = X.train, SIMPLIFY = FALSE) %>% 
@@ -443,24 +440,26 @@ weight <- E(net)$weight
 weight[weight == 0.5] <- 0.3
 
 ceb <- cluster_edge_betweenness(net) 
-dendPlot(ceb, mode="hclust")
-
 mark.groups <- split(as.character(nodes$id), factor(ceb$membership))
 mark.groups <- mark.groups[sapply(mark.groups, length) > 3]
-sapply(mark.groups, length)
-
-sapply(names(diabloPanel), function(i){
-  length(grep(i, mark.groups$`1`))
-})
 
 mark.col <- rainbow(length(mark.groups), alpha=.5)
-
-pdf(paste0(WhereAmI, "results/Figures/network_brca.pdf"), height = 8, width = 8)
 plot(net, edge.curved=.2, vertex.label.cex=0.01, vertex.size=6, mark.groups=mark.groups, 
   mark.col=mark.col, vertex.label.color="black") 
 legend("bottomleft", names(diabloPanel), col=unique(V(net)$color), pch = 19, bty="n")
-dev.off()
+```
 
+### Number of variables of each omic-type in the red cluster
+
+```{r}
+sapply(names(diabloPanel), function(i){
+  length(grep(i, mark.groups$`1`))
+})
+```
+
+## Geneset enrichment analysis
+
+```{r genesetEnrichment_brca, fig.path='Figures/', dev='png', fig.height=7, fig.width=7}
 ## perform gene set enrichment analysis on each cluster of features
 ## intersection > 5 genes
 input <- unlist(strsplit(sapply(strsplit(mark.groups[[1]], "_"), function(i) i[2]), ";"))
@@ -469,13 +468,9 @@ enrichment <- sear(input, "mrna") %>%
     filter(fdr < 0.05, collection %in% "C2") %>% 
     filter(subcollection != "CGP")
 
-pdf(paste0(WhereAmI, "results/Figures/genesetEnrichment_brca.pdf"), height = 7, width = 7)
 enrichment %>% ungroup %>% 
   mutate(geneset = tolower(sapply(strsplit(as.character(geneset), "_"), function(i) paste(i[-1], collapse=" ")))) %>% 
     arrange(desc(fdr)) %>% 
-  #mutate(geneset = sapply(strsplit(as.character(a$geneset), " "), function(i){
-  #       ifelse(length(i) >= 5, paste(c(i[1:5], i[-c(1:5)]), collapse="\n"), paste(i, collapse = " "))
-  #  })) %>% 
     mutate(geneset = factor(geneset, unique(geneset))) %>% 
   ggplot(aes(x = geneset, y = -log10(fdr), fill = subcollection, color = subcollection)) +
   geom_bar(stat = "identity", position = "dodge") +
@@ -485,6 +480,5 @@ enrichment %>% ungroup %>%
   theme(legend.position = c(0.55,0.1)) +
   ylab("Gene sets") +
   xlab(expression("Significance (-log"[10]~"FDR)"))
-dev.off()
 
 ```
