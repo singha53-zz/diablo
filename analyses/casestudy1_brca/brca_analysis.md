@@ -2,8 +2,10 @@
 title: "Case study 1: Breast cancer"
 output:
   html_document:
+    toc: yes
+    theme: united
+    highlight: tango
     keep_md: yes
-    toc: true
 ---
 
 
@@ -36,9 +38,6 @@ output:
 ## Optimal DIABLO model
 
 
-```
-## [1] TRUE
-```
 
 
 ```
@@ -110,65 +109,6 @@ output:
 ## Evaluate performance of diablo panel using additional data (test datasets)
 
 
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1]   379 16851
-```
-
-```
-## [1] 379 349
-```
-
-```
-## [1]  379 9482
-```
-
-```
-## [1] 379 115
-```
-
-```
-## [1] 989
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1]   610 16851
-```
-
-```
-## [1] 610 349
-```
-
-```
-## [1]  610 9482
-```
 
 ### Number of samples in the train and test datasets
 
@@ -179,48 +119,34 @@ output:
 ## 2   102   40  346  122  Test
 ```
 
+## Individual class error rate per PAM50 subtype
+
 
 ```
 ##       Basal        Her2        LumA        LumB  Overall.ER Overall.BER 
 ##  0.04901961  0.20000000  0.13294798  0.53278689  0.20327869  0.22868862
 ```
 
-# DIABLO (Sample plots)
+## Component plots
 
+![](Figures/SamplePlots_trainEllipses_testPoints-1.png)<!-- -->
 
-```
-## pdf 
-##   3
-```
+## Heatmap
 
-## heatmap
+![](Figures/heatmap_brca-1.png)<!-- -->
 
+## Network
 
-```
-## quartz_off_screen 
-##                 2
-```
+![](Figures/network_brca-1.png)<!-- -->
 
-# network
+### Number of variables of each omic-type in the red cluster
 
-![](brca_analysis_files/figure-html/unnamed-chunk-18-1.png)<!-- -->
-
-```
-##  1  2  3 12 
-## 72 15 17 16
-```
 
 ```
 ##     mRNA    miRNA     CpGs Proteins 
 ##       20       21       15       16
 ```
 
-```
-## quartz_off_screen 
-##                 2
-```
+## Geneset enrichment analysis
 
-```
-## quartz_off_screen 
-##                 2
-```
+![](Figures/genesetEnrichment_brca-1.png)<!-- -->

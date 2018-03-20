@@ -1,13 +1,11 @@
 ---
 title: "Case study 1: Breast cancer"
 output:
-  rmdformats::readthedown:
-  self_contained: true
-  lightbox: true
-  gallery: false
-  highlight: tango
-  keep_md: yes
-  toc: true
+  html_document:
+    toc: yes
+    theme: united
+    highlight: tango
+    keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
