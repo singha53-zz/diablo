@@ -1,6 +1,5 @@
 ---
 title: "Case study 1: Breast cancer"
-bibliography: /Users/asingh/Dropbox/Manuscript/diablo/mybib.bib
 thanks: "Replication files are available at https://github.com/singha53/diablo"
 output:
   html_document:
@@ -8,14 +7,23 @@ output:
     theme: united
     highlight: tango
     keep_md: yes
-biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ---
 
 
 
 \pagebreak
 
-# Number of samples and variables per dataset
+## Number of samples and variables per dataset
+
+
+
+```
+##    mRNA miRNA CpGs Proteins          Attribute
+## 1   379   379  379      379  Number of Samples
+## 2 16851   349 9482      115 Number of features
+```
+
+## Phenotype breakdown
 
 
 ```
@@ -24,47 +32,9 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ##    76    38   188    77
 ```
 
-```
-## [1] TRUE
-```
+## Tune DIABLO model
 
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-## [1] TRUE
-```
-
-```
-##       mRNA miRNA CpGs Proteins
-## [1,]   379   379  379      379
-## [2,] 16851   349 9482      115
-```
-
-# Tune DIABLO model
-
-
-
-## Component 1
-
-
-
-## Component 2
-
-
-
-## Component 3
-
-
-```
-## pdf 
-##   3
-```
+![](Figures/optimal_errorRate_tuneFunction_mixOmics-1.png)<!-- -->
 
 ## Optimal DIABLO model
 
@@ -72,6 +42,7 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ```
 ## [1] TRUE
 ```
+
 
 ```
 ## # A tibble: 3 x 4
@@ -83,7 +54,7 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ## 3  20_20_5_20 0.1791252 0.01936363  comp3
 ```
 
-## optimal keepX
+### optimal keepX
 
 
 ```
@@ -100,12 +71,11 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ## [1] 15 20 20
 ```
 
-
-# DIABLO-supervised
-
+## run DIABLO - with optimal keepX
 
 
-# Number of variables of each omic-type in the diablo panel
+
+### Number of variables of each omic-type in the diablo panel
 
 
 ```
@@ -113,28 +83,32 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 ##       45       45       25       55
 ```
 
-## overlap across different omic layers
+### overlap between the different omic compartments (mRNA,miRNA,CpGs and Protein)
+  * all mRNA, CpGs and proteins have been converted to gene symbols
 
-![](brca_analysis_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
+![](brca_analysis_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+
+#### overlap between the mRNA and CpGs
+
 
 ```
 ## [1] "ORMDL3"
 ```
 
+#### overlap between the mRNA and Proteins
+
+
 ```
 ## [1] "GATA3"  "INPP4B" "AR"
 ```
 
-![](brca_analysis_files/figure-html/unnamed-chunk-10-2.png)<!-- -->
+### overlap between the diablo panel features (mRNA,miRNA,CpGs and Protein) and with curated databases
 
+![](brca_analysis_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
 
-## plot features
+## Feature Plot
 
-
-```
-## pdf 
-##   3
-```
+![](Figures/brcaPanel_features-1.png)<!-- -->
 
 # Component plots
 
@@ -236,7 +210,7 @@ biblio-style: /Users/asingh/Dropbox/Manuscript/diablo/genome-biology.csl
 
 # network
 
-![](brca_analysis_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
+![](brca_analysis_files/figure-html/unnamed-chunk-16-1.png)<!-- -->
 
 ```
 ##  1  2  3 12 
