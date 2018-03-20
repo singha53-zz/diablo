@@ -1,11 +1,11 @@
 ---
 title: "Case study 1: Breast cancer"
 output:
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
-    toc: true
+  html_document:
+    theme: united
+    highlight: tango
     keep_md: yes
+    toc: true
 ---
 
 
