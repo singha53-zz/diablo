@@ -13,7 +13,7 @@ output:
 
 # Table of contents
 
-## 1) [Multi-omics methods overview](https://github.com/singha53/diablo/tree/master/analyses/methods_overview)
+## 1) [Multi-omics methods overview](https://github.com/singha53/diablo/blob/master/analyses/methods_overview/methods.md)
 * Describe types of multi-omic methods (unsupervised and supervised methods and variable selection (yes/no))
   
 ## 2) [Simulation Study](https://github.com/singha53/diablo/blob/master/analyses/simulation_study/simulation_study.md)
