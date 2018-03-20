@@ -1,14 +1,11 @@
 ---
 title: 'Simulation study'
-thanks: "Replication files are available at https://github.com/singha53/diablo"
 output:
-  rmdformats::readthedown:
-  self_contained: true
-  lightbox: true
-  gallery: false
-  highlight: tango
-  keep_md: yes
-  toc: true
+  html_document:
+    toc: yes
+    theme: united
+    highlight: tango
+    keep_md: yes
 ---
 
 ```{r setup, message=FALSE, warning=FALSE, tidy=TRUE, echo=FALSE}
