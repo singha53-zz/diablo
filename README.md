@@ -11,7 +11,7 @@ output:
 
 
 
-![Contributors](https://github.com/singha53/diablo/blob/master/analyses/methods_overview/Figure1_asEdit.png)
+![Contributors](https://github.com/singha53/diablo/blob/master/titlepage.png)
 
 
 # Table of contents
