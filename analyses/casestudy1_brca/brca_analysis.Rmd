@@ -1,0 +1,495 @@
+---
+title: "Case study 1: Breast cancer"
+thanks: "Replication files are available at https://github.com/singha53/diablo"
+output:
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_knit$set(root.dir = '~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/results/')
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE)
+
+WhereAmI <- "~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/"
+
+## load libraries
+library(cowplot)
+library(tidyverse)
+library(mixOmics)
+library(amritr)
+library(corrplot)
+require(parallel)
+library(sear)
+library(UpSetR)
+library(venn)
+library(igraph)
+library(ggraph)
+library(ggalt)
+library(RColorBrewer)
+
+## load data
+load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/trainTestDatasetsNormalized.RDATA")
+```
+
+\pagebreak
+
+## Number of samples and variables per dataset
+
+```{r, results = 'hide'}
+Y.train <- droplevels(pam50Train0$Call)
+names(Y.train) <- rownames(pam50Train0)
+table(Y.train)
+X.train <- list(mRNA = mrnaTrain0, miRNA = mirnaTrain0, CpGs = methTrain0, Proteins = protTrain0)
+all(names(Y.train) == rownames(X.train[[1]]))
+all(names(Y.train) == rownames(X.train[[2]]))
+all(names(Y.train) == rownames(X.train[[3]]))
+all(names(Y.train) == rownames(X.train[[4]]))
+```
+```{r}
+sapply(X.train, dim) %>% 
+  as.data.frame %>% 
+  mutate(Attribute = c("Number of Samples", "Number of features"))
+```
+
+## Phenotype breakdown
+
+```{r}
+table(Y.train)
+```
+
+## Tune DIABLO model
+
+```{r optimal_errorRate_tuneFunction_mixOmics, fig.path='Figures/', dev='png', fig.height = 10, fig.width = 20}
+## design matrix
+design <- matrix(1, nrow = length(X.train), ncol = length(X.train))
+rownames(design) <- colnames(design) <- names(X.train)
+diag(design) <- 0
+test.keepX = list(mRNA = c(5, 10, 15, 20), miRNA = c(5, 10, 15, 20), CpGs = c(5, 10, 15, 20), Proteins = c(5, 10, 15, 20))
+
+#t1 <- proc.time()
+#tune = tune.block.splsda(X = X.train, Y = Y.train, ncomp = 3, test.keepX = test.keepX, dist = "centroids.dist",
+#                          design = design, validation = "Mfold", folds = 5, nrepeat = 5, cpus = 5)
+#t2 <- proc.time()
+#(t2-t1)/60 # 77.3640000 minutes
+#saveRDS(tune, "~/Dropbox/Manuscript/diablo_datasets/brca/brcaPanel_tune.rds")
+
+tune <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune.rds")
+
+## Component 1
+p1 <- data.frame(mean = tune$error.rate[, "comp1"], sd = tune$error.rate.sd[, "comp1"]) %>% 
+  as.data.frame %>% 
+  mutate(keep = rownames(.)) %>% 
+  arrange(mean) %>% 
+  mutate(keep = factor(keep, keep), Comp = "Component 1") %>% 
+  slice(1:50) %>% 
+  ggplot(aes(y = keep, x = mean)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = mean-sd,  xmax = mean+sd)) +
+  customTheme(sizeStripFont = 25, xAngle = 0, hjust = 0.5, vjust = 0.5, xSize = 15, 
+              ySize = 15, xAxisSize = 15, yAxisSize = 15) +
+  xlab("Mean±SD Error rate \n (5 x 5-fold cross-validation)") +
+  ylab("Number of features per dataset (mRNA_miRNA_CpGs_Proteins) \n top 50 keepX with the minimum error rate for component 1") +
+  facet_wrap(~Comp) +
+  annotate("text", label = "minError = 31.5% \n (20_15_10_20)", x = 0.38, y = 0.75, size = 5) +
+  xlim(c(0.28,0.4))
+
+## Component 2
+p2 <- data.frame(mean = tune$error.rate[, "comp2"], sd = tune$error.rate.sd[, "comp2"]) %>% 
+  as.data.frame %>% 
+  mutate(keep = rownames(.)) %>% 
+  arrange(mean) %>% 
+  mutate(keep = factor(keep, keep), Comp = "Component 2") %>% 
+  slice(1:50) %>% 
+  ggplot(aes(y = keep, x = mean)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = mean-sd,  xmax = mean+sd)) +
+  customTheme(sizeStripFont = 25, xAngle = 0, hjust = 0.5, vjust = 0.5, xSize = 15, 
+              ySize = 15, xAxisSize = 15, yAxisSize = 15) +
+  xlab("Mean±SD Error rate \n (5 x 5-fold cross-validation)") +
+  ylab("Number of features per dataset (mRNA_miRNA_CpGs_Proteins) \n top 50 keepX with the minimum error rate for component 2") +
+  facet_wrap(~Comp) +
+  annotate("text", label = "minError = 21.9% \n (20_15_10_20)", x = 0.3, y = 0.75, size = 5) +
+  xlim(c(0.16,0.4))
+
+## Component 3
+p3 <- data.frame(mean = tune$error.rate[, "comp3"], sd = tune$error.rate.sd[, "comp3"]) %>% 
+  as.data.frame %>% 
+  mutate(keep = rownames(.)) %>% 
+  arrange(mean) %>% 
+  mutate(keep = factor(keep, keep), Comp = "Component 3") %>% 
+  slice(1:50) %>% 
+  ggplot(aes(y = keep, x = mean)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = mean-sd,  xmax = mean+sd)) +
+  customTheme(sizeStripFont = 25, xAngle = 0, hjust = 0.5, vjust = 0.5, xSize = 15, 
+              ySize = 15, xAxisSize = 15, yAxisSize = 15) +
+  xlab("Mean±SD Error rate \n (5 x 5-fold cross-validation)") +
+  ylab("Number of features per dataset (mRNA_miRNA_CpGs_Proteins) \n top 50 keepX with the minimum error rate for component 3") +
+  facet_wrap(~Comp) +
+  annotate("text", label = "minError = 17.9% \n (20_15_10_20)", x = 0.25, y = 0.75, size = 5) +
+  xlim(c(0.15,0.3))
+
+plot_grid(p1, p2, p3, ncol = 3)
+```
+
+## Optimal DIABLO model
+
+```{r}
+## check rownames ordering
+all(rownames(tune$error.rate) == rownames(tune$error.rate.sd))
+```
+
+```{r}
+data.frame(keepX = rep(rownames(tune$error.rate), 3), 
+  meanError = as.numeric(tune$error.rate), 
+  sdError = as.numeric(tune$error.rate.sd),
+  comp = rep(paste0("comp", 1:3), each=nrow(tune$error.rate))) %>% 
+  group_by(comp) %>% 
+  filter(meanError == min(meanError))
+```
+
+### optimal keepX
+
+```{r}
+tune$choice.keepX
+```
+
+## run DIABLO - with optimal keepX
+
+```{r}
+ncomp <- 3
+keepX = tune$choice.keepX
+
+diablo = block.splsda(X = X.train, Y = Y.train, ncomp = ncomp, keepX = keepX, design = design)
+```
+
+### Number of variables of each omic-type in the diablo panel
+
+```{r}
+diabloPanel <- mapply(function(x, y, z){
+  c(x, y, z)
+}, x = lapply(selectVar(diablo, comp = 1)[-5], function(i) unlist(i[[1]])),
+   y = lapply(selectVar(diablo, comp = 2)[-5], function(i) unlist(i[[1]])),
+   z = lapply(selectVar(diablo, comp = 3)[-5], function(i) unlist(i[[1]])))
+sapply(diabloPanel, length)
+
+## only keep unique features
+diabloPanel <- lapply(diabloPanel, unique)
+```
+
+### overlap between the different omic compartments (mRNA,miRNA,CpGs and Protein)
+  * all mRNA, CpGs and proteins have been converted to gene symbols
+
+```{r}
+venn(diabloPanel)
+```
+
+#### overlap between the mRNA and CpGs
+
+```{r}
+intersect(diabloPanel$mRNA, diabloPanel$CpGs)
+```
+
+#### overlap between the mRNA and Proteins
+
+```{r}
+intersect(diabloPanel$mRNA, diabloPanel$Proteins)
+```
+
+### overlap between the diablo panel features (mRNA,miRNA,CpGs and Protein) and with curated databases
+
+```{r}
+driverdbv2 <- read.delim(paste0(WhereAmI, "disease_collections/driverdbv2.txt"), header = FALSE) %>% 
+  as.matrix %>% 
+  as.character()
+
+mircancer <- read.delim(paste0(WhereAmI, "disease_collections/miRCancerOctober2017.txt"), header = FALSE)
+mircancer <- mircancer[grep("breast", tolower(as.character(mircancer$V2))), "V1"] %>% as.character() %>% unique()
+
+molsigdb <- collections[grep("BREAST", collections$geneset), "members_mrna"] %>% unlist %>% unique
+
+omim0 <- read.delim(paste0(WhereAmI, "disease_collections/OMIM_Disease.txt"), header = FALSE)
+omim <- apply(omim0[, -1], 1, function(i){
+    x <- as.character(as.matrix(i))[as.character(as.matrix(i)) != ""]
+    x[!is.na(x)]
+  })
+names(omim) <- as.character(omim0[,1])
+omim <- omim[grep("breast", names(omim), value = TRUE)] %>% 
+  unlist %>% unique
+
+brca_genes = list(DIABLO = unlist(unlist(diabloPanel)),
+                  MolSigDB = molsigdb,
+                  DriverDBv2 = driverdbv2,
+                  OMIM = omim,
+  miRCancer=mircancer)
+venn(brca_genes, ilab=TRUE, zcolor = "style")
+
+
+brcaDatabase <- data.frame(database = rep(c("MolSigDB", "DriverDBv2", "OMIM", "miRCancer"), c(length(molsigdb), length(driverdbv2), length(omim), length(mircancer))),
+  feature = c(molsigdb, driverdbv2, omim, mircancer))
+
+```
+
+## Feature Plot
+
+```{r brcaPanel_features, fig.path='Figures/', dev='png', fig.width = 10, fig.height=13}
+databases <- c("No overlap", "miRCancer", "DriverDBv2", "MolSigDB", "MolSigDB_DriverDBv2", "MolSigDB_DriverDBv2_OMIM", "MolSigDB_OMIM")
+featurePlot = function(panel, omicName, database){
+  Dat <- rbind(selectVar(diablo, comp = 1)[[omicName]][["value"]], 
+  selectVar(diablo, comp = 2)[[omicName]][["value"]],
+  selectVar(diablo, comp = 3)[[omicName]][["value"]]) %>% 
+  data.frame() %>% 
+  mutate(dataset = omicName,
+         feature = gsub(";", "\n", rownames(.)),
+         value.var = abs(value.var)) %>% 
+  group_by(dataset) %>% 
+  arrange(value.var) %>% 
+  mutate(feature = factor(as.character(feature), feature))
+  Dat$database <- sapply(as.character(Dat$feature), function(i){
+  paste(unique(as.character(subset(brcaDatabase, feature %in% unlist(strsplit(i, ";")))$database)), collapse = "_")})
+  Dat$database[Dat$database == ""] <- "No overlap"
+  Dat$database <- factor(as.character(Dat$database), databases)
+  
+  Segment <- geom_segment(aes(yend = feature, color = database), xend = 0, size = 1)
+  Point <- geom_point(size = 4, aes(color = database, fill = database)) 
+  Theme <- theme_bw() + theme(panel.grid.major.y = element_blank(),legend.justification = c(1, 0.5))
+  
+  ggplot(Dat, aes(x = value.var, y = feature)) +
+ 	Segment +
+ 	Point +
+	Theme +
+	ggtitle(omicName) + ylab("Variables")
+}
+
+p1 <- featurePlot(panel=diabloPanel, omicName="mRNA", database=database) +
+  theme(legend.position = c(0.95,0.15)) + scale_color_manual(values=c("#000000", "#E69F00", "#56B4E9")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=16), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("", limits = c(0, 1), breaks = seq(0,1,0.2)) 
+p2 <- featurePlot(panel=diabloPanel, omicName="miRNA", database=database) +
+  theme(legend.position = c(0.95,0.15)) + ylab("") + scale_color_manual(values=c("#000000", "#0072B2")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=16), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("", limits = c(0, 1), breaks = seq(0,1,0.2))
+p3 <- featurePlot(panel=diabloPanel, omicName="CpGs", database=database) +
+  theme(legend.position = c(0.95,0.15)) + scale_color_manual(values=c("#000000", "#E69F00")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=16), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("Variable contributions \n absolute loadings", limits = c(0, 1), breaks = seq(0,1,0.2))
+p4 <- featurePlot(panel=diabloPanel, omicName="Proteins", database=database) +
+  theme(legend.position = c(0.95,0.2)) + ylab("") + scale_color_manual(values=c("#000000", "#CC79A7", "#E69F00", "#56B4E9", "#009E73", "#F0E442")) + 
+  theme(legend.title = element_text(size=16), 
+    legend.text = element_text(size=10), 
+    plot.title = element_text(size=26, face = "bold")) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 15, ySize = 9, xAxisSize = 20, yAxisSize = 20) + 
+  scale_x_continuous("Variable contributions \n absolute loadings", limits = c(0, 1), breaks = seq(0,1,0.2))
+
+plot_grid(p1, p2, p3, p4, ncol = 2)
+```
+
+## Evaluate performance of diablo panel using additional data (test datasets)
+
+```{r}
+## Training data
+Y.train <- droplevels(pam50Train0$Call)
+names(Y.train) <- rownames(pam50Train0)
+X.train <- list(mRNA = mrnaTrain0, miRNA = mirnaTrain0, CpGs = methTrain0, Proteins = protTrain0)
+all(names(Y.train) == rownames(X.train[[1]]))
+all(names(Y.train) == rownames(X.train[[2]]))
+all(names(Y.train) == rownames(X.train[[3]]))
+all(names(Y.train) == rownames(X.train[[4]]))
+dim(X.train[[1]]); dim(X.train[[2]]); dim(X.train[[3]]); dim(X.train[[4]]);
+## Test data
+Y.test <- droplevels(pam50Test0$Call)
+names(Y.test) <- rownames(pam50Test0)
+length(c(Y.train, Y.test))
+X.test <- list(mRNA = mrnaTest0, miRNA = mirnaTest0, CpGs = methTest0)
+all(names(Y.test) == rownames(X.test[[1]]))
+all(names(Y.test) == rownames(X.test[[2]]))
+all(names(Y.test) == rownames(X.test[[3]]))
+dim(X.test[[1]]); dim(X.test[[2]]); dim(X.test[[3]]); 
+```
+
+### Number of samples in the train and test datasets
+
+```{r}
+rbind(table(Y.train), table(Y.test)) %>% 
+  as.data.frame %>% 
+  mutate(Set = c("Train", "Test"))
+```
+
+```{r}
+## build diablo model and test on independent dataset
+pred <- predict(diablo, X.test, dist = "all")
+
+TestError <- apply(pred$WeightedVote$centroids.dist, 2, function(y) {
+      y[is.na(y)] <- nlevels(Y.test) + 5
+      temp = table(factor(y, levels = c(levels(Y.test), 
+        nlevels(Y.test) + 5)), Y.test)
+      diag(temp) <- 0
+      err = c(colSums(temp)/summary(Y.test), sum(temp)/length(Y.test), 
+        mean(colSums(temp)/summary(Y.test)))
+      return(err = err)
+    })
+rownames(TestError) <- c(levels(Y.test), "Overall.ER", "Overall.BER")
+TestError[, "comp3"]
+```
+
+# DIABLO (Sample plots)
+
+```{r, fig.height=5, fig.width=13}
+# model variates
+varDat.train <- do.call(rbind, diablo$variates[1:length(X.train)]) %>% 
+  as.data.frame %>% mutate(subj = rownames(.))
+varDat.train$Dataset <- rep(names(X.train), e = length(Y.train))
+varDat.train$Class <- Y.train
+varDat.train <- varDat.train %>% group_by(Class, subj) %>% 
+  summarise_all(funs(mean)) %>% 
+  mutate(Dataset = "Consensus") %>% 
+  dplyr::select(`comp 1`, `comp 2`, `comp 3`, subj, Dataset, Class) %>% 
+  as.data.frame() %>% 
+  rbind(., varDat.train) %>% 
+  mutate(Dataset = factor(Dataset, c("Consensus", "mRNA", "miRNA", "CpGs", "Proteins"))) 
+
+# test variates
+varDat.test <- do.call(rbind, pred$variates) %>% as.data.frame %>% mutate(subj = rownames(.))
+varDat.test$Dataset <- rep(names(pred$variates), e = nrow(pred$variates[[1]]))
+varDat.test$Class <- Y.test
+colnames(varDat.train) <- colnames(varDat.test) <- c("comp 1", "comp 2", "comp 3", "subj", "Dataset", "Class")
+varDat.test <- varDat.test %>% group_by(Class, subj) %>% 
+  summarise_all(funs(mean)) %>% 
+  mutate(Dataset = "Consensus") %>% 
+  dplyr::select(`comp 1`, `comp 2`, `comp 3`, subj, Dataset, Class) %>% 
+  as.data.frame() %>% 
+  rbind(., varDat.test) %>% 
+  mutate(Dataset = factor(Dataset, c("Consensus", "mRNA", "miRNA", "CpGs", "Proteins"))) 
+
+p1 <- filter(varDat.test, Dataset == "Consensus") %>% 
+  ggplot(aes(x = `comp 1`, y = `comp 2`, color = Class)) + 
+  geom_point(size = 2) +
+  facet_wrap(~Dataset, scales = "free", ncol = 5) + 
+   stat_ellipse(data = filter(varDat.train, Dataset == "Consensus"), size = 1) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
+  xlab("Component 1") + ylab("Component 2") + 
+  theme(strip.text.x = element_text(size=26, face = "bold")) + 
+  scale_color_manual(values=color.mixo(1:4))
+
+p2 <- filter(varDat.test, Dataset != "Consensus") %>% 
+  ggplot(aes(x = `comp 1`, y = `comp 2`, color = Class)) + 
+  geom_point(size = 2) +
+  facet_wrap(~Dataset, scales = "free", ncol = 2) + 
+   stat_ellipse(data = filter(varDat.train, Dataset != "Consensus"), size = 1) +
+  customTheme(sizeStripFont = 25, xAngle = 0.5, hjust = 0.5, vjust = 0.5,
+              xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
+  xlab("Component 1") + ylab("Component 2") + 
+  theme(strip.text.x = element_text(size=26, face = "bold")) + 
+  scale_color_manual(values=color.mixo(1:4))
+
+pdf(paste0(WhereAmI, "results/Figures/SamplePlots_trainEllipses_testPoints.pdf"), height = 13, width = 10)
+plot_grid(p1, p2, ncol=1) 
+dev.off()
+
+
+```
+
+## heatmap
+
+```{r}
+pdf(paste0(WhereAmI, "results/Figures/heatmap_brca.pdf"), height = 10, width = 8)
+cimDiablo(diablo, row.names = FALSE, col.names = FALSE)
+dev.off()
+
+
+```
+
+# network
+
+```{r}
+corMat <- mapply(function(x, y){
+  y[, x]
+}, x = diabloPanel, y = X.train, SIMPLIFY = FALSE) %>% 
+  do.call(cbind, .) %>% 
+  cor
+colnames(corMat) <- rownames(corMat) <- paste(rep(names(diabloPanel), sapply(diabloPanel, length)), colnames(corMat), sep="_")
+
+corMat[lower.tri(corMat)] <- 0
+diag(corMat) <- 0
+
+color.blocks = brewer.pal(n = 12, name = "Paired")[seq(2, 12, by = 2)]
+links <- corMat %>% 
+  as.data.frame() %>% 
+  mutate(to = rownames(.)) %>% 
+  gather(from, cor, -to) %>% 
+  filter(abs(cor) > 0.4) %>% 
+  mutate(Color = ifelse(cor > 0, "red", "blue"))
+nodes <- data.frame(id = unique(c(links$to, links$from)))
+nodes$datasets <- sapply(strsplit(as.character(nodes$id), "_"), function(i) i[1])
+net <- graph_from_data_frame(d=links, vertices=nodes, directed=FALSE) 
+E(net)$color <- links$Color
+V(net)$color <- color.blocks[as.numeric(factor(nodes$datasets, names(diabloPanel)))]
+E(net)$weight <- abs(links$cor)
+weight <- E(net)$weight
+weight[weight == 0.5] <- 0.3
+
+ceb <- cluster_edge_betweenness(net) 
+dendPlot(ceb, mode="hclust")
+
+mark.groups <- split(as.character(nodes$id), factor(ceb$membership))
+mark.groups <- mark.groups[sapply(mark.groups, length) > 3]
+sapply(mark.groups, length)
+
+sapply(names(diabloPanel), function(i){
+  length(grep(i, mark.groups$`1`))
+})
+
+mark.col <- rainbow(length(mark.groups), alpha=.5)
+
+pdf(paste0(WhereAmI, "results/Figures/network_brca.pdf"), height = 8, width = 8)
+plot(net, edge.curved=.2, vertex.label.cex=0.01, vertex.size=6, mark.groups=mark.groups, 
+  mark.col=mark.col, vertex.label.color="black") 
+legend("bottomleft", names(diabloPanel), col=unique(V(net)$color), pch = 19, bty="n")
+dev.off()
+
+## perform gene set enrichment analysis on each cluster of features
+## intersection > 5 genes
+input <- unlist(strsplit(sapply(strsplit(mark.groups[[1]], "_"), function(i) i[2]), ";"))
+enrichment <- sear(input, "mrna") %>% 
+    group_by(collection, subcollection) %>% 
+    filter(fdr < 0.05, collection %in% "C2") %>% 
+    filter(subcollection != "CGP")
+
+pdf(paste0(WhereAmI, "results/Figures/genesetEnrichment_brca.pdf"), height = 7, width = 7)
+enrichment %>% ungroup %>% 
+  mutate(geneset = tolower(sapply(strsplit(as.character(geneset), "_"), function(i) paste(i[-1], collapse=" ")))) %>% 
+    arrange(desc(fdr)) %>% 
+  #mutate(geneset = sapply(strsplit(as.character(a$geneset), " "), function(i){
+  #       ifelse(length(i) >= 5, paste(c(i[1:5], i[-c(1:5)]), collapse="\n"), paste(i, collapse = " "))
+  #  })) %>% 
+    mutate(geneset = factor(geneset, unique(geneset))) %>% 
+  ggplot(aes(x = geneset, y = -log10(fdr), fill = subcollection, color = subcollection)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
+    xSize = 20, ySize = 9, xAxisSize = 20, yAxisSize = 20) +
+  theme(legend.position = c(0.55,0.1)) +
+  ylab("Gene sets") +
+  xlab(expression("Significance (-log"[10]~"FDR)"))
+dev.off()
+
+```
