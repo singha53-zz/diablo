@@ -2,8 +2,6 @@
 title: "Case study 1: Breast cancer"
 output:
   html_document:
-    theme: united
-    highlight: tango
     keep_md: yes
     toc: true
 ---
