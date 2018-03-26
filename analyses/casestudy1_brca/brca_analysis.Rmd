@@ -1,11 +1,12 @@
 ---
 title: "Case study 1: Breast cancer"
 output:
-  html_document:
-    toc: yes
-    theme: united
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
     highlight: tango
-    keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRU
 WhereAmI <- "~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/"
 
 ## load libraries
+library(knitr)
 library(cowplot)
 library(tidyverse)
 library(mixOmics)
@@ -32,7 +34,36 @@ library(RColorBrewer)
 load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/trainTestDatasetsNormalized.RDATA")
 ```
 
-\pagebreak
+## DIABLO identified known and novel multi-omics biomarkers of breast cancer subtypes
+
+We next demonstrate that DIABLO can identify novel biomarkers in addition to biomarkers with known biological associations using a case study of human breast cancer. We applied our biomarker analysis workflow to breast cancer datasets to characterize and predict PAM50 breast cancer subtypes. 
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/Figures/SuppFig7.png"
+include_graphics(img1_path)
+```
+
+*A standard DIABLO workflow. The first step inputs multiple omics datasets measured on the same individuals, that were previously normalized and filtered, , along with the phenotype information indicating the class membership of each sample (two or more groups). Optional preprocessing steps include multilevel transformation for repeated measures study designs and pathway module summary transformations. DIABLO is a multivariate dimension reduction method that seeks for latent components – linear combinations of variables from each omics dataset, that are maximally correlated as specified by a design matrix (see Methods section). The identification of a multi-omics panel is obtained with l1 penalties in the model that shrink the variable coefficients defining the components to zero. Numerous visualizations are proposed to provide insights into the multi-omics panel and guide the interpretation of the selected omics variables, including sample and variable plots. Downstream analysis include gene set enrichment analysis.*
+
+After preprocessing and normalization of each omics data-type, the samples were divided into training and test sets.
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/Figures/Table1.png"
+include_graphics(img1_path)
+```
+
+*Overview of multi-omics datasets analyzed for method benchmarking and in two case studies. The breast cancer case study includes training and test datasets for all omics types except proteins.*
+
+The training data consisted of four omics-datasets (mRNA, miRNA, CpGs and proteins) whereas the test data included all remaining samples for which the protein expression data were missing. The optimal multi-omics biomarker panel size was identified using a grid approach where, for any given combination of variables, we assessed the classification performance using a 5-fold cross-validation repeated 5 times. 
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/Figures/optimal_errorRate_tuneFunction_mixOmics-1.png"
+include_graphics(img1_path)
+```
+
+*Breast cancer multi omics study: optimal multi-omics biomarker panel for PAM50 subtypes. A grid was used to identify the optimal combination of variables select from each omics datasets. The following grid values was used for each omics dataset: mRNA = [5, 10, 15, 20], miRNA = [5, 10, 15, 20], CpGs = [5, 10, 15, 20], Proteins = [5, 10, 15, 20], across 3 components. The centroids distance measure was used to compute the error rate26. The optimal multi-omics panel consisted of 20 mRNAs, 20 miRNAs, 15 CpGs and 15 proteins on component 1, 5 mRNAs, 5 miRNAs, 5 CpGs and 20 proteins on component 2, and 20 mRNAs, 20 miRNAs, 5 CpGs and 20 proteins on component 3.*
+
+The number of variables that resulted in the minimum balanced error rate were retained as previously described in [12]. 
 
 ## Number of samples and variables per dataset
 
@@ -46,6 +77,7 @@ all(names(Y.train) == rownames(X.train[[2]]))
 all(names(Y.train) == rownames(X.train[[3]]))
 all(names(Y.train) == rownames(X.train[[4]]))
 ```
+
 ```{r}
 sapply(X.train, dim) %>% 
   as.data.frame %>% 
@@ -134,6 +166,8 @@ plot_grid(p1, p2, p3, ncol = 3)
 ```
 
 ## Optimal DIABLO model
+
+The optimal multi-omics panel consisted of 45 mRNA, 45 miRNAs, 25 CpGs and 55 proteins selected across three components with a balanced error rate of 17.9±1.9%. 
 
 ```{r, results='hide'}
 ## check rownames ordering
@@ -232,6 +266,8 @@ brcaDatabase <- data.frame(database = rep(c("MolSigDB", "DriverDBv2", "OMIM", "m
 ```
 
 ## Feature Plot
+
+This panel identified many variables with previously known associations with breast cancer, as assessed by looking at the overlap between the panel features and gene sets related to breast cancer based on the Molecular Signature database (MolSigDB) [23], miRCancer [24], Online Mendelian Inheritance in Man (OMIM) [25], and DriverDBv2 [26]. The feature plot depicts the variable contributions of each omics-type indicated by their loading weight (variable importance). Variables not found in any database may represent novel biomarkers of breast cancer.
 
 ```{r brcaPanel_features, fig.path='Figures/', dev='png', fig.width = 10, fig.height=13}
 databases <- c("No overlap", "miRCancer", "DriverDBv2", "MolSigDB", "MolSigDB_DriverDBv2", "MolSigDB_DriverDBv2_OMIM", "MolSigDB_OMIM")
@@ -350,6 +386,8 @@ TestError[, "comp3"]
 
 ## Component plots
 
+The plot below depicts the consensus and individual omics component plots based on the optimal biomarker panel, along with 95% confidence ellipses obtained from the training data and superimposed with the samples from the test data. The majority of the samples were within the ellipses, suggesting a reproducible multi-omics biomarker panel from the training to the test set, that was predictive of breast cancer subtypes (balanced error rate = 22.9%). The consensus plot corresponded strongly with the mRNA component plot, depicting a strong separation of the Basal (error rate = 4.9%) and Her2 (error rate = 20%) subtypes. We observed a weak separation of Luminal A (LumA, error rate = 13.3%) and Luminal B (LumB, error rate = 53.3%) subtypes. 
+
 ```{r SamplePlots_trainEllipses_testPoints, fig.path='Figures/', dev='png', fig.height=13, fig.width=10}
 # model variates
 varDat.train <- do.call(rbind, diablo$variates[1:length(X.train)]) %>% 
@@ -404,11 +442,15 @@ plot_grid(p1, p2, ncol=1)
 
 ## Heatmap
 
+Similarly, the heatmap showing the scaled expression of all features of the multi-omics biomarker panel, depicted a strong clustering of the Basal and Her2 samples whereas the Luminal A and B were mixed. 
+
 ```{r heatmap_brca, fig.path='Figures/', dev='png', fig.height=10, fig.width=8}
 cimDiablo(diablo, row.names = FALSE, col.names = FALSE)
 ```
 
 ## Network
+
+Overall, the features of the multi-omics biomarker panel formed a densely connected network comprising of four communities where variables in each community (cluster) were densely connected with themselves and sparsely connected with other clusters. 
 
 ```{r network_brca, fig.path='Figures/', dev='png', fig.height=8, fig.width=8}
 corMat <- mapply(function(x, y){
@@ -457,6 +499,8 @@ sapply(names(diabloPanel), function(i){
 
 ## Geneset enrichment analysis
 
+The largest cluster in the network consisted of 72 variables; 20 mRNAs, 21 miRNAs, 15 CpGs and 16 proteins (red bubble) and was further investigated using gene set enrichment analysis. We identified many cancer-associated pathways (e.g. FOXM1 pathway, p53 signaling pathway), DNA damage and repair pathways (e.g. E2F mediated regulation of DNA replication, G2M DNA damage checkpoint) and various cell-cycle pathways (e.g. G1S transition, mitotic G1/G1S phases), demonstrating the ability of DIABLO to identify a biologically plausible multi-omics biomarker panel. This panel generalized to new breast cancer samples and implicated previously unknown molecular features in breast cancer, which could be further validated in experimental studies. 
+
 ```{r genesetEnrichment_brca, fig.path='Figures/', dev='png', fig.height=7, fig.width=7}
 ## perform gene set enrichment analysis on each cluster of features
 ## intersection > 5 genes
@@ -480,3 +524,14 @@ enrichment %>% ungroup %>%
   xlab(expression("Significance (-log"[10]~"FDR)"))
 
 ```
+
+## References
+3. Wang B, Mezlini AM, Demir F, Fiume M, Tu Z, Brudno M, et al. Similarity network fusion for aggregating data types on a genomic scale. Nat Methods [Internet]. 2014 [cited 2016 Jan 19];11:333–7. Available from: http://www.nature.com/doifinder/10.1038/nmeth.2810
+12. Rohart F, Gautier B, Singh A, Cao K-AL. mixOmics: An R package for ‘omics feature selection and multiple data integration. PLOS Comput Biol [Internet]. 2017 [cited 2018 Jan 29];13:e1005752. Available from: http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005752
+19. The TCGA Research Network. The Cancer Genome Atlas [Internet]. Available from: http://cancergenome.nih.gov/
+20. Singh A, Yamamoto M, Kam SHY, Ruan J, Gauvreau GM, O’Byrne PM, et al. Gene-metabolite expression in blood can discriminate allergen-induced isolated early from dual asthmatic responses. Hsu Y-H, editor. PLoS ONE [Internet]. 2013 [cited 2015 Jul 18];8:e67907. Available from: http://dx.plos.org/10.1371/journal.pone.0067907
+21. Singh A, Yamamoto M, Ruan J, Choi JY, Gauvreau GM, Olek S, et al. Th17/Treg ratio derived using DNA methylation analysis is associated with the late phase asthmatic response. Allergy Asthma Clin Immunol [Internet]. 2014 [cited 2016 Mar 2];10:32. Available from: http://www.biomedcentral.com/content/pdf/1710-1492-10-32.pdf
+23. Liberzon A, Birger C, Thorvaldsdóttir H, Ghandi M, Mesirov JP, Tamayo P. The Molecular Signatures Database Hallmark Gene Set Collection. Cell Syst [Internet]. 2015 [cited 2018 Jan 30];1:417–25. Available from: http://linkinghub.elsevier.com/retrieve/pii/S2405471215002185
+24. Xie B, Ding Q, Han H, Wu D. miRCancer: a microRNA-cancer association database constructed by text mining on literature. Bioinformatics [Internet]. 2013 [cited 2018 Jan 30];29:638–44. Available from: https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btt014
+25. Hamosh A. Online Mendelian Inheritance in Man (OMIM), a knowledgebase of human genes and genetic disorders. Nucleic Acids Res [Internet]. 2004 [cited 2018 Jan 30];33:D514–7. Available from: https://academic.oup.com/nar/article-lookup/doi/10.1093/nar/gki033
+26. Chung I-F, Chen C-Y, Su S-C, Li C-Y, Wu K-J, Wang H-W, et al. DriverDBv2: a database for human cancer driver gene research. Nucleic Acids Res [Internet]. 2016 [cited 2018 Jan 30];44:D975–9. Available from: https://academic.oup.com/nar/article-lookup/doi/10.1093/nar/gkv1314

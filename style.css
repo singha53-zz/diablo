@@ -3,16 +3,17 @@
 }
 
 
-.diablo {
+#diablo {
 	font-family: 'Faster One', cursive;
 	text-align: center;
 	font-size: 5em;
-	padding-bottom: 0%;
-	margin-bottom: 0%;
+	padding-bottom: 0rem;
+	margin-bottom: 0rem;
 }
 
 .jumbotron {
     padding: 0rem 2rem 3rem 1rem;
+    margin: 0 0 0 0;
     text-align: center;
 }
 
@@ -27,4 +28,8 @@
     line-height: 60px;
     background-color: #343a40;
     color: white;
+}
+
+p {
+    margin-bottom: 0rem;
 }

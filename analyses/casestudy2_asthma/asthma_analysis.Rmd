@@ -1,11 +1,12 @@
 ---
-title: "asthma_analysis"
+title: "Case study 2: Allergic Asthma"
 output:
-  html_document:
-    toc: yes
-    theme: united
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
     highlight: tango
-    keep_md: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -23,6 +24,7 @@ library(NMF)
 library(RColorBrewer)
 library(cowplot)
 library(scales)
+library(knitr)
 library(UpSetR)
 library(org.Hs.eg.db)
 library(KEGG.db)
@@ -45,9 +47,20 @@ colnames(gene.module)[colnames(gene.module) %in% intersect(colnames(gene.module)
 
 ```
 
-\pagebreak
+## DIABLO for repeated measures designs and module-based analyses 
+
+Next, we demonstrate the flexibility of DIABLO by extending its use to a repeated measures cross-over study [27], as well as incorporating module-based analyses that incorporate prior biological knowledge [28–30]. We use a small multi-omics asthma dataset, including pre and post intervention timepoints, to compare a DIABLO model that can account for repeated measures (multilevel DIABLO) with the standard DIABLO model as described above [20,21]. An allergen inhalation challenge was performed as we previously described in [20,21] in 14 subjects and blood samples were collected before (pre) and two hours after (post) challenge; cell-type frequencies, leukocyte gene transcript expression and plasma metabolite abundances were determined for all samples. 
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/Figures/Table1.png"
+include_graphics(img1_path)
+```
+
+*Overview of multi-omics datasets analyzed for method benchmarking and in two case studies. The breast cancer case study includes training and test datasets for all omics types except proteins.*
 
 ## FEV1 profiles
+
+We observed a net decline in lung function after allergen inhalation challenge (Supplementary Fig. 9), and the goal of this study was to identify perturbed molecular mechanisms in the blood in response to allergen inhalation challenge. 
 
 ```{r fev1Plots, fig.path='Figures/', dev='png', fig.height = 5, fig.width = 7}
 fev1 <- read.csv("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/asthma/fev1Data.csv", row.names = 1)[, c("BLFEV","F10L","F20L","F30L","F45L","F60L","F90L","F120L","F180L","F240L","F300L","F360L","F420L")]
@@ -77,7 +90,16 @@ p
 
 ## DIABLO
 
-### tune keepX
+A module based approach (also known as eigengene summarization [18], see Methods) was used to transform both the gene expression and metabolite datasets into pathway datasets. Consequently, each variable in those two datasets now represented the scaled pathway activity expression level for each sample instead of direct gene/metabolite expression. The mRNA dataset was transformed into a dataset of metabolic pathways (based on the Kyoto Encyclopedia of Genes and Genomes, KEGG) whereas the metabolite dataset was transformed into a metabolite pathway dataset based on annotations provided by Metabolon Inc. (Durham, North Carolina, USA). 
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy2_asthma/Figures/designMatrix.png"
+include_graphics(img1_path)
+```
+
+To account for the repeated measures experimental design, a multilevel approach [27] was first used to isolate the within-sample variation from each dataset (see Methods), and then DIABLO was applied to identify a multi-omics biomarker panel consisting of cells, gene and metabolite modules that discriminated pre- from post-challenge samples. 
+
+## tune keepX
 
 ```{r}
 X <- list(cells=cells, gene.module=gene.module, metabolite.module=metabolite.module)
@@ -93,7 +115,9 @@ design <- matrix(1, nrow = 3, ncol = 3)
 diag(design) <- 0
 ```
 
-### error rate of optimal keepX
+## error rate of optimal keepX
+
+We contrast the resulting ‘multilevel DIABLO’ (mDIABLO) with a standard DIABLO model that disregards the paired nature of this study by comparing their cross-validation classification performances.
 
 ```{r aucPlot, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 7}
 keepX = list(cells = c(3, 3), gene.module = c(5, 5), metabolite.module = c(5, 5))
@@ -119,7 +143,7 @@ aucPlot <- rbind(cv$unpaired$roc.res, cv$paired$roc.res) %>%
 aucPlot
 ```
 
-### diablo - unpaired and paired
+## DIABLO - unpaired (DIABLO) vs paired (mDIABLO)
 
 ```{r}
 # unpaired
@@ -142,7 +166,9 @@ diablowPanel <- list(cells = c(selectVar(diablow, comp = 1)$cells$name,
 
 ```
 
-### Component plots
+## Component plots
+
+mDIABLO outperformed DIABLO (AUC=98.5% vs. AUC=62.2%, leave-one-out cross-validation, see Methods), and we observed a greater degree of separation between the pre- and post-challenge samples for mDIABLO compared to DIABLO. 
 
 ```{r auc_componentPlot, fig.path='Figures/', dev='png', fig.height = 4, fig.width = 13}
 dat <- as.data.frame(Reduce("+", diablo$variates)/length(X)) %>% 
@@ -178,7 +204,9 @@ plot_grid(aucPlot, p1, p2, ncol = 3)
 
 ```
 
-## compare multi-omic panels
+## Compare DIABLO vs. mDIABLO multi-omic panels
+
+Common features (pathways) were identified across omics-types in the mDIABLO model, but not in the standard DIABLO model. Tryptophan metabolism and Valine, leucine and isoleucine metabolism pathways were identified in both the gene and metabolite module datasets using mDIABLO. 
 
 ```{r overlap, fig.path='Figures/', dev='png', fig.height = 4, fig.width = 7}
 diablowPanel_modif <- diablowPanel
@@ -207,7 +235,9 @@ upset(input, sets = colnames(input), keep.order = TRUE,
 
 ```
 
-### heatmap
+## Heatmap
+
+The heatmap of pairwise associations of all features identified with mDIABLO demonstrated the ability of DIABLO to select groups of correlated features which were predictive of pre- and post-challenge samples. 
 
 ```{r varCor, fig.path='Figures/', dev='png', fig.height = 15, fig.width = 15}
 corMat <- mapply(function(x, y){
@@ -226,13 +256,15 @@ legend("topright", names(diablowPanel), col = color.blocks, pch = 19, bty = "n",
 
 ```
 
-### circosplot
+The Asthma pathway was also identified [even though individual gene members were not significantly altered post-challenge and was negatively associated with Butanoate metabolism and positively associated with basophils, a hallmark cell-type in asthma. These findings depict DIABLO’s flexibility and sensitivity to detect subtle differences between repeated designs, and its ability to identify common molecular processes spanning different biological layers. The biological pathways identified suggest a mechanistic link with response to allergen challenge. 
+
+## Circosplot
 
 ```{r circosPlot, fig.path='Figures/', dev='png', fig.height = 15, fig.width = 15}
 circosPlot(diablow, cutoff = 0.8, showIntraLinks = FALSE, size.variables = 1, size.labels = 2, size.legend = 2, color.blocks = color.blocks)
 ```
 
-### Asthma KEGG pathway
+## Asthma KEGG pathway
 
 ```{r Asthma_pathwayGenes, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 7}
 ## obtain KEGG id for the Asthma pathway
@@ -249,7 +281,6 @@ geneIDs <- eg[eg %in% entrez]
 
 ## extract expression data for genes in the asthma pathway
 genesDat <- genExp[names(geneIDs), ]
-dim(genesDat)
 
 pval <- apply(genesDat, 1, function(i){
   t.test(i[demo$Time == "post"], i[demo$Time == "pre"], paired = TRUE)$p.value
@@ -271,3 +302,14 @@ text(x = -0.10, y = -log10(0.045), labels = "P-value = 0.05")
 
 ```
 
+## References
+
+3. Wang B, Mezlini AM, Demir F, Fiume M, Tu Z, Brudno M, et al. Similarity network fusion for aggregating data types on a genomic scale. Nat Methods [Internet]. 2014 [cited 2016 Jan 19];11:333–7. Available from: http://www.nature.com/doifinder/10.1038/nmeth.2810
+18. Langfelder P, Horvath S. WGCNA: an R package for weighted correlation network analysis. BMC Bioinformatics [Internet]. 2008 [cited 2016 Apr 4];9:559. Available from: http://www.biomedcentral.com/1471-2105/9/559
+19. The TCGA Research Network. The Cancer Genome Atlas [Internet]. Available from: http://cancergenome.nih.gov/
+20. Singh A, Yamamoto M, Kam SHY, Ruan J, Gauvreau GM, O’Byrne PM, et al. Gene-metabolite expression in blood can discriminate allergen-induced isolated early from dual asthmatic responses. Hsu Y-H, editor. PLoS ONE [Internet]. 2013 [cited 2015 Jul 18];8:e67907. Available from: http://dx.plos.org/10.1371/journal.pone.0067907
+21. Singh A, Yamamoto M, Ruan J, Choi JY, Gauvreau GM, Olek S, et al. Th17/Treg ratio derived using DNA methylation analysis is associated with the late phase asthmatic response. Allergy Asthma Clin Immunol [Internet]. 2014 [cited 2016 Mar 2];10:32. Available from: http://www.biomedcentral.com/content/pdf/1710-1492-10-32.pdf
+27. Liquet B, Lê Cao K-A, Hocini H, Thiébaut R. A novel approach for biomarker selection and the integration of repeated measures experiments from two assays. BMC Bioinformatics [Internet]. 2012 [cited 2015 Jul 18];13:325. Available from: http://www.biomedcentral.com/1471-2105/13/325/
+28. Allahyar A, de Ridder J. FERAL: network-based classifier with application to breast cancer outcome prediction. Bioinformatics [Internet]. 2015 [cited 2018 Feb 1];31:i311–9. Available from: https://academic.oup.com/bioinformatics/article-lookup/doi/10.1093/bioinformatics/btv255
+29. Cun Y, Fröhlich H. Network and data integration for biomarker signature discovery via network smoothed t-statistics. Boccaletti S, editor. PLoS ONE [Internet]. 2013 [cited 2017 May 30];8:e73074. Available from: http://dx.plos.org/10.1371/journal.pone.0073074
+30. Sokolov A, Carlin DE, Paull EO, Baertsch R, Stuart JM. Pathway-based genomics prediction using generalized elastic net. PLoS Comput Biol [Internet]. 2016 [cited 2017 May 30];12:e1004790. Available from: http://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1004790

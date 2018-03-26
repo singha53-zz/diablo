@@ -1,11 +1,12 @@
 ---
 title: "Benchmarking"
 output:
-  html_document:
-    toc: yes
-    theme: united
+  rmdformats::readthedown:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
     highlight: tango
-    keep_md: yes
 ---
 
 ```{r setup, message=FALSE, warning=FALSE, tidy=TRUE, echo=FALSE}
@@ -15,6 +16,7 @@ knitr::opts_chunk$set(out.width = '100%', dpi=300)
 WhereAmI <- "~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/benchmarking/"
 
 ## load libraries
+library(knitr)
 library(cowplot)
 library(r.jive)
 library(tidyverse)
@@ -38,7 +40,18 @@ load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/benchmarking/jive/jive
 load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/benchmarking/mofa/mofa_SNFdatasets.RDATA")
 ```
 
-# SNF data description
+## DIABLO identifies molecular networks with superior biological enrichment
+
+To assess this, we turn to real biological datasets. We applied various integrative approaches to cancer multi-omics datasets (mRNA, miRNA, and CpG) – colon, kidney, glioblastoma (gbm) and lung – and identified multi-omics biomarker panels that were predictive of high and low survival times. We then compared the network properties and biological enrichment of the selected features across approaches.
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/Figures/Table1.png"
+include_graphics(img1_path)
+```
+
+*Overview of multi-omics datasets analyzed for method benchmarking and in two case studies. The breast cancer case study includes training and test datasets for all omics types except proteins.*
+
+## SNF data description
   * The SNF datasets were part of the datasets used in the Nature Methods paper on Similarity Network Fusion (SNF); https://www.nature.com/articles/nmeth.2810
   * The cancer datasets include GBM (Brain), Colon, Kidney, Lung and Breast (the Breast cancer dataset was excluded in order to avoid confusion with the case study on Breast Cancer)
   * The datasets were obtained from: http://compbio.cs.toronto.edu/SNF/SNF/Software.html
@@ -58,6 +71,8 @@ sapply(snf_data, function(i) sapply(i, ncol))
 ```
 
 # Multi-omic biomarker panels
+
+Multi-omics biomarker panels were developed using component-based integrative approaches that also performed variable selection: supervised methods included concatenation and ensemble schemes using the sPLSDA classifier [14], and DIABLO with either the null or full design (DIABLO_null, and DIABLO_full); unsupervised approaches included sparse generalized canonical correlation analysis [15] (sGCCA), Multi-Omics Factor Analysis (MOFA), and Joint and Individual Variation Explained (JIVE) [23] (see Supplementary Note for parameter settings). Both supervised and unsupervised approaches were considered in order to compare and contrast the types of omics-variables selected, network properties and biological enrichment results. A distinction was made between DIABLO models in which the correlation between omics datasets was not maximized (DIABLO_null) and those when the correlation between omics datasets was maximized (DIABLO_full).
 
 ## Unsupervised
 
@@ -281,6 +296,8 @@ snf_diabloFull <- mapply(function(x, y, z){
 \pagebreak
 
 # Number of features per panel
+
+Each multi-omics biomarker panel included 180 features (60 features of each omics type across 2 components). Approaches generally identified distinct sets of features. The plots below depict the distinct and shared features between the seven multi-omics panels obtained from the unsupervised (purple, sGCCA, MOFA and JIVE) and supervised (green, Concatenation, Ensemble, DIABLO_null and DIABLO_full) methods. Supervised methods selected many of the same features (blue), but DIABLO_full had greater feature overlap with unsupervised methods (orange). 
 
 ```{r panelSizes, fig.path='Figures/', dev='png', fig.height = 5, fig.width = 5}
 multiOmicPanels <- list(JIVE = snf_jive$panel, MOFA = snf_mofa$panel, sGCCA = snf_sgcca$panel,
@@ -506,6 +523,17 @@ venn(lung_panels, zcolor = "style")
 ```
 
 # Gene set enrichment analysis
+
+Finally, we carried out gene set enrichment analysis on each multi-omics biomarker panel (using gene symbols of mRNAs and CpGs) against 10 gene set collections (see Methods) and tabulated the number of significant (FDR=5%) gene sets. The DIABLO_full model identified the greatest number of significant gene sets across the 10 gene set collections and generally ranked higher than the other methods in the colon (7 collections), gbm (5 collections) and lung (5 collections) cancer datasets, whereas JIVE outperformed all other methods in the kidney cancer datasets (6 collections). Unlike all other approaches considered, DIABLO_full, which aimed to explain both the correlation structure between multiple omics layers and a phenotype of interest, implicated the greatest number of known biological gene sets (pathways/functions/processes etc.). 
+
+
+```{r out.width="100%"}
+img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/benchmarking/Figures/Table2.png"
+include_graphics(img1_path)
+```
+
+*Overview of multi-omics datasets analyzed for method benchmarking and in two case studies. The breast cancer case study includes training and test datasets for all omics types except proteins.*
+
   * We wished to assess the enrichment of the selected features across a variety of annotated gene sets in the MSigDB collection (http://software.broadinstitute.org/gsea/msigdb), in particular:
 1. C1 - positional gene sets  for each human chromosome and cytogenetic band.
 2. C2 – curated gene sets (Pathway Interaction DB [PID], Biocarta [BIOCARTA], Kyoto Encyclopedia of Genes and Genomes [KEGG], Reactome [REACTOME], and others)
@@ -600,6 +628,8 @@ enrichedPathways %>%
 ```
 
 # Connectivity
+
+The level of connectivity of each of the seven multi-omics panels was assessed by generating networks from the feature adjacency matrix at various Pearson correlation coefficient cut-offs. At all cut-offs, unsupervised approaches produced networks with greater connectivity (number of edges) compared to supervised approaches. In addition, biomarker panels identified by DIABLO_full, were more similar to those identified by unsupervised approaches, including high graph density, low number of communities and large number of triads, indicating that DIABLO_full identified discriminative sets of features that were tightly correlated across biological compartments. 
 
 ```{r}
 cormat_pearson <- lapply(multiOmicPanels, function(i){
@@ -781,6 +811,8 @@ p
 ```
 
 ## network and component plot of the multi-omic panels derived using the colon cancer dataset
+
+The plots below depict the networks of all multi-omics biomarker panels for the colon cancer dataset, which show higher modularity (a limited number of large clusters of variables; circled) for the DIABLO_full and the unsupervised approaches as compared to the supervised ones. The corresponding component plots show a clear separation between the high and low survival groups for the panels derived using supervised approaches, whereas the unsupervised approaches could not segregate the survival groups. 
 
 ### networks
 
