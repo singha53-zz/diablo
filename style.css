@@ -1,5 +1,5 @@
 .pic {
-	height: 20em;
+    height: 17rem;
 }
 
 
@@ -32,4 +32,35 @@
 
 p {
     margin-bottom: 0rem;
+}
+
+.hide-bullets {
+    list-style:none;
+    margin-left: -40px;
+    margin-top:20px;
+}
+
+.carousel-control-prev {
+    left: 0;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.5) 0px, rgba(0, 0, 0, 0) 100%);
+    background-repeat: repeat-x
+}
+
+.carousel-control-next {
+    right: 0;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.5) 0px, rgba(0, 0, 0, 0) 100%);
+    background-repeat: repeat-x
+}
+
+.carousel-control-prev .carousel-control-next{
+    position: absolute;
+    top: 0px;
+    bottom: 0px;
+    left: 0px;
+    width: 5%;
+    font-size: 20px;
+    color: rgb(255, 255, 255);
+    text-align: center;
+    text-shadow: rgba(0, 0, 0, 0.6) 0px 1px 2px;
+    opacity: 0.5;
 }
