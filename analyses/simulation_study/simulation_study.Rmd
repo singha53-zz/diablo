@@ -56,7 +56,7 @@ include_graphics(img1_path)
 
 > **Integrative prediction frameworks including multi-step approaches (concatenation, ensemble) and DIABLO to identify multi-omics molecular signatures.** Concatenation-based integration combines multiple datasets into a single large dataset, with the aim to predict a phenotype of interest. Ensemble-based classification methods construct a predictive model on each individual dataset before combining the model predictions. None of these approaches account or model relationships between datasets and thus limit our understanding of molecular interactions at multiple functional levels. DIABLO simultaneously maximizes the associations between datasets and a phenotype of interest to identify a correlated set of variables of different omics-types that are also discriminatory. The prediction is based on each omics-associated component derived from the model (see Supplementary Note). All methods presented here are data-driven approaches, which do not use any prior knowledge such as from curated biological databases (eg. protein-protein interactions).
 
-```{r simulationResults, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 18}
+```{r simulationResults, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 16.5}
 J <- 3
 fcSeq <- c(0, 1, 2)
 noiseSeq <- c(0.2, 0.5, 1)
@@ -155,7 +155,7 @@ stopCluster(clust)
 ## Error rates
 errorRates <- do.call(rbind, result$err)  %>% 
     mutate(Classifier = factor(Classifier, 
-    levels = c("DIABLO_full", "DIABLO_null", "Concatenation", "Ensemble"))) %>% 
+    levels = c("Concatenation", "DIABLO_null", "DIABLO_full", "Ensemble"))) %>% 
   group_by(Classifier, FC, Noise) %>% 
   summarise(Mean = mean(error), SD = sd(error)) %>% 
   ungroup %>% 
@@ -173,7 +173,7 @@ errorRates <- do.call(rbind, result$err)  %>%
 ### Selected variables
 selectedVars <- do.call(rbind, result$vars) %>% ungroup %>% 
     mutate(Classifier = factor(Classifier, 
-    levels = c("DIABLO_full", "DIABLO_null", "Concatenation", "Ensemble"))) %>% 
+    levels = c("Concatenation", "DIABLO_null", "DIABLO_full", "Ensemble"))) %>% 
   group_by(Classifier, FC, Noise, varType) %>% 
   summarise(Mean = mean(n), SD = sd(n)) %>% 
   ungroup %>% 
@@ -188,7 +188,7 @@ selectedVars <- do.call(rbind, result$vars) %>% ungroup %>%
   geom_hline(yintercept = 180, linetype = "dashed") + xlab("Integrative Classifiers") +
   scale_y_continuous(breaks=c(60,120,180))
 
-plot_grid(errorRates, selectedVars, labels = c("A", "B"), label_size = 30)
+plot_grid(errorRates, selectedVars, labels = c("", ""), label_size = 30)
 ```
 
 > The covariance between datasets was held constant at 1, whereas the fold-change was varied from 0-2, and noise was varied from 0.2-1. As expected the error rate was roughly 50% when the fold-change was zero, regardless of noise level for all methods. When the fold-change was set to 1, the DIABLO model the full design (DIABLO_full) had a higher error rate as compared to the other methods, for noise levels less than 1. However, when the noise level was increased to match the level of the fold-change all methods performed similarly. When the fold-change was increased to 2 (higher than both the covariance and noise levels) the DIABLO_full model performed similarly with the other methods.
@@ -461,7 +461,7 @@ plot_ly(y=fc, x=cov,z=znull, type="contour", contours = list(showlabels = TRUE),
   layout(
     title = "Error rate, null design, 2 components",
     xaxis = list(title = "covariance between datasets"),
-    yaxis = list(title = "effect size"), margin=m)
+    yaxis = list(title = "fold-change"), margin=m)
 
 ```
 
