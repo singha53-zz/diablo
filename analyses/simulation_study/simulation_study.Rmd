@@ -64,7 +64,7 @@ fc.noise.grid <- expand.grid(fcSeq, noiseSeq)
 colnames(fc.noise.grid) <- c("FC", "Noise")
 nperms <- 20
 J=3; n=100; p_relevant=30; p_irrelevant=100
-folds=10; nrepeat = 1; ncomp = 1; 
+folds=10; nrepeat = 1; ncomp = 1; scheme <- "centroid";
 
 clust <- makeCluster(no_cores)
 clusterExport(clust, varlist=c("simData", "rmvnorm", "fc.noise.grid", "p_relevant", "p_irrelevant", "n", "J", "ncomp", "folds", "nrepeat", "perf.ensemble.splsda"))
@@ -89,31 +89,35 @@ result <- parLapply(clust, 1:nperms, function(x){
   keepX = list(rep(2*p_relevant, ncomp), rep(2*p_relevant, ncomp), rep(2*p_relevant, ncomp))
   rownames(design) <- colnames(design) <- names(keepX) <- names(data)
   result.full = block.splsda(X = data, Y = Y, ncomp = ncomp, keepX = keepX, design = design)
-  diabloFullPanels <- lapply(1:ncomp, function(i) {selectVar(result.full, ncomp=i)[1:J] %>% 
-          lapply(., function(j){ j[[1]]})
-        }) %>% unlist(.)
+  diabloFullPanels <- lapply(1 : ncomp, function(i){
+  lapply(selectVar(result.full, comp=i)[1:J], function(j){
+    j$name
+  }) %>% unlist()
+}) %>% unlist() %>% as.character()
   cv.full <- perf(result.full, validation = "Mfold", folds = folds, nrepeat = nrepeat, progressBar = FALSE)
   
   ## Apply DIABLO null design
   design <- matrix(0, nrow = J, ncol = J)
   rownames(design) <- colnames(design) <- names(data)
   result.null = block.splsda(X = data, Y = Y, ncomp = ncomp, keepX = keepX, design = design)
-  diabloNullPanels <- lapply(1:ncomp, function(i) {selectVar(result.null, ncomp=i)[1:J] %>% 
-          lapply(., function(j){ j[[1]]})
-        }) %>% unlist(.)
+  diabloNullPanels <- lapply(1 : ncomp, function(i){
+  lapply(selectVar(result.null, comp=i)[1:J], function(j){
+    j$name
+  }) %>% unlist()
+}) %>% unlist() %>% as.character()
   cv.null <- perf(result.null, validation = "Mfold", folds = folds, nrepeat = nrepeat, progressBar = FALSE)
   
   ## Concatenation
-  concat <- splsda(X = do.call(cbind, data), Y = Y, keepX = rep(2*J*p_relevant/ncomp, ncomp), ncomp = ncomp)
+  concat <- splsda(X = do.call(cbind, data), Y = Y, keepX = rep(2*J*p_relevant, ncomp), ncomp = ncomp)
   concatPanels <- lapply(1:ncomp, function(i) {selectVar(concat, ncomp=i)$name}) %>% unlist(.)
   cv.concat <- perf(concat, validation = "Mfold", folds = folds, nrepeat = nrepeat, progressBar = FALSE)
   
   ## Ensemble
   ensemblePanels <- lapply(data, function(i){
-    result <- splsda(X = i, Y = Y, keepX = rep(2*p_relevant/ncomp, ncomp), ncomp = ncomp)
+    result <- splsda(X = i, Y = Y, keepX = rep(2*p_relevant, ncomp), ncomp = ncomp)
     lapply(1:ncomp, function(i) {selectVar(result, ncomp=i)$name}) %>% unlist(.)
   }) %>% unlist()
-  cv.ensemble <- perf.ensemble.splsda(data, Y, keepX = rep(p_relevant, 1), ncomp = ncomp, nrepeat = nrepeat, M = folds)
+  cv.ensemble <- perf.ensemble.splsda(data, Y, keepX = rep(p_relevant, ncomp), ncomp = ncomp, nrepeat = nrepeat, M = folds)
   
   ## Proportion of selected variables
   panels <- list(DIABLO_Full=diabloFullPanels, DIABLO_Null=diabloNullPanels,
@@ -160,7 +164,7 @@ errorRates <- do.call(rbind, result$err)  %>%
   geom_bar(stat = "identity") + 
   geom_errorbar(aes(ymin = Mean-SD, ymax = Mean+SD)) +
   facet_grid(FC ~ Noise) +
-  customTheme(sizeStripFont = 25, xAngle = -45, hjust = 0, vjust = 1, 
+  customTheme(sizeStripFont = 20, xAngle = -45, hjust = 0, vjust = 1, 
               xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) +
   ylab("Mean±SD of error rate \n 10-fold cross-validation over 20 simulations") +
   xlab("Integrative Classifiers") +
@@ -178,13 +182,11 @@ selectedVars <- do.call(rbind, result$vars) %>% ungroup %>%
   geom_bar(stat = "identity") + 
   #geom_errorbar(aes(ymin = Mean, ymax = Mean+SD), position="dodge") +
   facet_grid(FC ~ Noise) +
-  customTheme(sizeStripFont = 25, xAngle = -45, hjust = 0, vjust = 1, 
+  customTheme(sizeStripFont = 20, xAngle = -45, hjust = 0, vjust = 1, 
               xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) +
   ylab("Average number of selected variables \n across 3 datasets over 20 simulations") +
   geom_hline(yintercept = 180, linetype = "dashed") + xlab("Integrative Classifiers") +
   scale_y_continuous(breaks=c(60,120,180))
-
-plot_grid(errorRates, selectedVars, labels = c("", ""), label_size = 30)
 
 ```
 
