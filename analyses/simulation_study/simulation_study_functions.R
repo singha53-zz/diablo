@@ -9,78 +9,76 @@ library(mixOmics)
 ## parameters to tune (fold-change, noise)
 ## types of variables (p_relevant-corDis, p_relevant-NonCorDis, p_irrelevant-corNonDis, p_irrelevant-NonCorNonDis)
 
-simData = function(fc, noise, J, n, p_relevant, p_irrelevant){
-  ## load libraries
-  library(tidyverse)
-  library(amritr)
-  library(mvtnorm)
-  
-  ## Generate variates that contribute to the full design
-  rho = 1
-  sigma = matrix(rho, J, J); diag(sigma) = 1
-  ## Variate for Group 1
-  bComp1 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
-  ## Variate for Group 2
-  bComp2 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
-  bComp.full <- rbind(bComp1, bComp2) 
-  bComp_full_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma))
-  colnames(bComp.full) <- colnames(bComp_full_irrelevant) <- paste("Dataset", 1:J, sep="_")
-  
-  ## Generate variates that contribute to the null design
-  rho = 0
-  sigma = matrix(rho, J, J); diag(sigma) = 1
-  ## Variate for Group 1
-  bComp1 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
-  ## Variate for Group 2
-  bComp2 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
-  bComp.null <- rbind(bComp1, bComp2)  #+ matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J)
-  bComp_null_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma))
-  colnames(bComp.null) <- colnames(bComp_null_irrelevant) <- paste("Dataset", 1:J, sep="_")
-  
-  ## Generate 3 datasets (first p_relevant variables contribute to the full design, 
-  ## the next to the null design)
-  allLoadings <- c(runif(1000, min = -0.3, max = -0.2), runif(1000, min = 0.2, max = 0.3))  # loadings 
-  X_relevant <- lapply(1 : J, function(i){
-    w.full <- sample(allLoadings, p_relevant); w.full <- w.full/sqrt(sum(w.full^2));
-    fullDat <- as.matrix(bComp.full[, i, drop = FALSE]) %*% matrix(w.full, nrow = 1)
-    w.null <- sample(allLoadings, p_relevant); w.null <- w.null/sqrt(sum(w.null^2));
-    nullDat <- as.matrix(bComp.null[, i, drop = FALSE]) %*% matrix(w.null, nrow = 1)
-    cbind(fullDat, nullDat)
-  })
-  
-  ## Add p_irrelevant correlative and non-correlative variables that are not discriminatory
-  ## correlative variables
-  allLoadings <- c(runif(1000, min = -0.3, max = -0.2), runif(1000, min = 0.2, max = 0.3))  # loadings 
-  X_irrelevant <- lapply(1 : J, function(i){
-    w.full <- sample(allLoadings, p_irrelevant); w.full <- w.full/sqrt(sum(w.full^2));
-    corDat <- as.matrix(bComp_full_irrelevant[, i, drop = FALSE]) %*% matrix(w.full, nrow = 1)
-    w.null <- sample(allLoadings, p_irrelevant); w.null <- w.null/sqrt(sum(w.null^2));
-    noncorDat <- as.matrix(bComp_null_irrelevant[, i, drop = FALSE]) %*% matrix(w.null, nrow = 1)
-    cbind(corDat, noncorDat)
-  })
-  
-  ## final dataset
-  X2 <- lapply(1 : J, function(i){
-    cbind(X_relevant[[i]], X_irrelevant[[i]])
-  })
-  names(X2) <- c("Dataset1", "Dataset2", "Dataset3")
-  
-  ## add noise
-  data <- lapply(1 : J, function(i){
-    i2 <- X2[[i]] + matrix(rnorm(length(X2[[i]]), mean = 0, sd = noise), nr = nrow(X2[[i]]))
-    colnames(i2) <- paste(paste(rep(c("corDis", "unCorDis", "corNonDis", "unCorNonDis"), 
-      c(p_relevant,p_relevant,p_irrelevant,p_irrelevant)), 
-      c(1:p_relevant, 1:p_relevant, 1:p_irrelevant, 1:p_irrelevant), sep = "."), "Dat", i, sep = "_")
-    rownames(i2) <- paste0("Subj", 1:nrow(i2))
-    i2
-  })
-  names(data) <- paste0("Dataset", 1:J)
-  
-  ## response variables
-  Y <- rep(c("group1", "group2"), each = n)
-  names(Y) <- paste0("Subj", 1:nrow(data[[1]]))
-  
-  return(list(data=data, Y=Y, 
+simData = function(fc, noise, J, n, p_relevant, p_irrelevant, cov){
+    ## load libraries
+    library(tidyverse)
+    library(amritr)
+    library(mvtnorm)
+    
+    ## Generate variates that contribute to the full design
+    sigma = matrix(cov, J, J); #diag(sigma) = 1
+    ## Variate for Group 1
+    bComp1 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
+    ## Variate for Group 2
+    bComp2 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
+    bComp.full <- rbind(bComp1, bComp2)
+    bComp_full_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma))
+    colnames(bComp.full) <- colnames(bComp_full_irrelevant) <- paste("Dataset", 1:J, sep="_")
+    
+    ## Generate variates that contribute to the null design
+    sigma = matrix(0, J, J); diag(sigma) = 1
+    ## Variate for Group 1
+    bComp1 <- as.data.frame(rmvnorm(n, rep(fc/2, J), sigma))
+    ## Variate for Group 2
+    bComp2 <- as.data.frame(rmvnorm(n, rep(-fc/2, J), sigma))
+    bComp.null <- rbind(bComp1, bComp2)  #+ matrix(rnorm(2*n*J, mean = 0, sd = noise), nc = J)
+    bComp_null_irrelevant <- as.data.frame(rmvnorm(2*n, rep(0, J), sigma))
+    colnames(bComp.null) <- colnames(bComp_null_irrelevant) <- paste("Dataset", 1:J, sep="_")
+    
+    ## Generate 3 datasets (first p_relevant variables contribute to the full design,
+    ## the next to the null design)
+    allLoadings <- c(runif(1000, min = -0.3, max = -0.2), runif(1000, min = 0.2, max = 0.3))  # loadings
+    X_relevant <- lapply(1 : J, function(i){
+        w.full <- sample(allLoadings, p_relevant); w.full <- w.full/sqrt(sum(w.full^2));
+        fullDat <- as.matrix(bComp.full[, i, drop = FALSE]) %*% matrix(w.full, nrow = 1)
+        w.null <- sample(allLoadings, p_relevant); w.null <- w.null/sqrt(sum(w.null^2));
+        nullDat <- as.matrix(bComp.null[, i, drop = FALSE]) %*% matrix(w.null, nrow = 1)
+        cbind(fullDat, nullDat)
+    })
+    
+    ## Add p_irrelevant correlative and non-correlative variables that are not discriminatory
+    ## correlative variables
+    allLoadings <- c(runif(1000, min = -0.3, max = -0.2), runif(1000, min = 0.2, max = 0.3))  # loadings
+    X_irrelevant <- lapply(1 : J, function(i){
+        w.full <- sample(allLoadings, p_irrelevant); w.full <- w.full/sqrt(sum(w.full^2));
+        corDat <- as.matrix(bComp_full_irrelevant[, i, drop = FALSE]) %*% matrix(w.full, nrow = 1)
+        w.null <- sample(allLoadings, p_irrelevant); w.null <- w.null/sqrt(sum(w.null^2));
+        noncorDat <- as.matrix(bComp_null_irrelevant[, i, drop = FALSE]) %*% matrix(w.null, nrow = 1)
+        cbind(corDat, noncorDat)
+    })
+    
+    ## final dataset
+    X2 <- lapply(1 : J, function(i){
+        cbind(X_relevant[[i]], X_irrelevant[[i]])
+    })
+    names(X2) <- c("Dataset1", "Dataset2", "Dataset3")
+    
+    ## add noise
+    data <- lapply(1 : J, function(i){
+        i2 <- X2[[i]] + matrix(rnorm(length(X2[[i]]), mean = 0, sd = noise), nr = nrow(X2[[i]]))
+        colnames(i2) <- paste(paste(rep(c("corDis", "unCorDis", "corNonDis", "unCorNonDis"),
+        c(p_relevant,p_relevant,p_irrelevant,p_irrelevant)),
+        c(1:p_relevant, 1:p_relevant, 1:p_irrelevant, 1:p_irrelevant), sep = "."), "Dat", i, sep = "_")
+        rownames(i2) <- paste0("Subj", 1:nrow(i2))
+        i2
+    })
+    names(data) <- paste0("Dataset", 1:J)
+    
+    ## response variables
+    Y <- rep(c("group1", "group2"), each = n)
+    names(Y) <- paste0("Subj", 1:nrow(data[[1]]))
+    
+    return(list(data=data, Y=Y,
     bComp.full=bComp.full, bComp_full_irrelevant=bComp_full_irrelevant,
     bComp.null=bComp.null, bComp_null_irrelevant=bComp_null_irrelevant))
 }
@@ -214,7 +212,7 @@ perf.ensemble.splsda = function(data, Y, keepX, ncomp, nrepeat, M){
       
       pred <- lapply(1 : J, function(i){
         result <- splsda(X = data.train[[i]], Y = Y.train, keepX = keepX, ncomp = ncomp)
-        predict(result, data.test[[i]])$class$max.dist
+        predict(result, data.test[[i]])$class$max.dist[, ncomp]
       })
       predLabel[[j]] <- do.call(cbind, pred)
     }

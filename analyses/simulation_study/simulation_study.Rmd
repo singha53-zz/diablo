@@ -89,7 +89,7 @@ result <- parLapply(clust, 1:nperms, function(x){
   keepX = list(rep(2*p_relevant, ncomp), rep(2*p_relevant, ncomp), rep(2*p_relevant, ncomp))
   rownames(design) <- colnames(design) <- names(keepX) <- names(data)
   result.full = block.splsda(X = data, Y = Y, ncomp = ncomp, keepX = keepX, design = design)
-  diabloFullPanels <- lapply(1 : ncomp, function(i){
+  diablofullPanels <- lapply(1 : ncomp, function(i){
   lapply(selectVar(result.full, comp=i)[1:J], function(j){
     j$name
   }) %>% unlist()
@@ -100,7 +100,7 @@ result <- parLapply(clust, 1:nperms, function(x){
   design <- matrix(0, nrow = J, ncol = J)
   rownames(design) <- colnames(design) <- names(data)
   result.null = block.splsda(X = data, Y = Y, ncomp = ncomp, keepX = keepX, design = design)
-  diabloNullPanels <- lapply(1 : ncomp, function(i){
+  diablonullPanels <- lapply(1 : ncomp, function(i){
   lapply(selectVar(result.null, comp=i)[1:J], function(j){
     j$name
   }) %>% unlist()
@@ -120,12 +120,12 @@ result <- parLapply(clust, 1:nperms, function(x){
   cv.ensemble <- perf.ensemble.splsda(data, Y, keepX = rep(p_relevant, ncomp), ncomp = ncomp, nrepeat = nrepeat, M = folds)
   
   ## Proportion of selected variables
-  panels <- list(DIABLO_Full=diabloFullPanels, DIABLO_Null=diabloNullPanels,
+  panels <- list(DIABLO_full=diablofullPanels, DIABLO_null=diablonullPanels,
                  Concatenation=concatPanels, Ensemble=ensemblePanels)
   vars <- lapply(panels, function(i){
     as.character(sapply(strsplit(i, "\\."), function(i) i[1]))})
   dats <- lapply(panels, function(i){
-    as.character(sapply(strsplit(diabloFullPanels, "_"), function(i) paste(i[-1], collapse = "_")))})
+    as.character(sapply(strsplit(diablofullPanels, "_"), function(i) paste(i[-1], collapse = "_")))})
   varDat <- cbind(unlist(dats), unlist(vars)) %>% 
     as.data.frame() %>% 
     mutate(dataset=V1, varType = V2, Classifier = rep(names(dats), sapply(dats, length))) %>% 
@@ -141,7 +141,7 @@ result <- parLapply(clust, 1:nperms, function(x){
   err <- data.frame(error = c(cv.full$WeightedVote.error.rate$max.dist["Overall.BER", ncomp],
                             cv.null$WeightedVote.error.rate$max.dist["Overall.BER", ncomp], 
                             cv.concat$error.rate$BER[ncomp, "max.dist"], cv.ensemble$Mean)) %>% 
-         mutate(Classifier = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))
+         mutate(Classifier = c("DIABLO_full", "DIABLO_null", "Concatenation", "Ensemble"))
   err$FC <- paste("FC", fc, sep = "_")
   err$Noise <- paste("Noise", noise, sep = "_")
   errList[[h]] <- err
@@ -155,7 +155,7 @@ stopCluster(clust)
 ## Error rates
 errorRates <- do.call(rbind, result$err)  %>% 
     mutate(Classifier = factor(Classifier, 
-    levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
+    levels = c("DIABLO_full", "DIABLO_null", "Concatenation", "Ensemble"))) %>% 
   group_by(Classifier, FC, Noise) %>% 
   summarise(Mean = mean(error), SD = sd(error)) %>% 
   ungroup %>% 
@@ -173,7 +173,7 @@ errorRates <- do.call(rbind, result$err)  %>%
 ### Selected variables
 selectedVars <- do.call(rbind, result$vars) %>% ungroup %>% 
     mutate(Classifier = factor(Classifier, 
-    levels = c("DIABLO_Full", "DIABLO_Null", "Concatenation", "Ensemble"))) %>% 
+    levels = c("DIABLO_full", "DIABLO_null", "Concatenation", "Ensemble"))) %>% 
   group_by(Classifier, FC, Noise, varType) %>% 
   summarise(Mean = mean(n), SD = sd(n)) %>% 
   ungroup %>% 
@@ -188,9 +188,10 @@ selectedVars <- do.call(rbind, result$vars) %>% ungroup %>%
   geom_hline(yintercept = 180, linetype = "dashed") + xlab("Integrative Classifiers") +
   scale_y_continuous(breaks=c(60,120,180))
 
+plot_grid(errorRates, selectedVars, labels = c("A", "B"), label_size = 30)
 ```
 
-> The covariance between datasets was held constant at 1, whereas the fold-change was varied from 0-2, and noise was varied from 0.2-1. As expected the error rate was roughly 50% when the fold-change was zero, regardless of noise level for all methods. When the fold-change was set to 1, the DIABLO model the full design (DIABLO_Full) had a higher error rate as compared to the other methods, for noise levels less than 1. However, when the noise level was increased to match the level of the fold-change all methods performed similarly. When the fold-change was increased to 2 (higher than both the covariance and noise levels) the DIABLO_Full model performed similarly with the other methods.
+> The covariance between datasets was held constant at 1, whereas the fold-change was varied from 0-2, and noise was varied from 0.2-1. As expected the error rate was roughly 50% when the fold-change was zero, regardless of noise level for all methods. When the fold-change was set to 1, the DIABLO model the full design (DIABLO_full) had a higher error rate as compared to the other methods, for noise levels less than 1. However, when the noise level was increased to match the level of the fold-change all methods performed similarly. When the fold-change was increased to 2 (higher than both the covariance and noise levels) the DIABLO_full model performed similarly with the other methods.
 
 # Trade-off between correlation and discrimination
 
@@ -204,48 +205,48 @@ noise <- 0.5
 p_relevant <- 30; p_irrelevant <- 100; n <- 100; J <- 3;
 keepX <- list(rep(p_relevant, 1), rep(p_relevant, 1), rep(p_relevant, 1))
 names(keepX) <- c("Dataset1", "Dataset2", "Dataset3")
-designFull <- matrix(1, nrow = J, ncol = J)
-diag(designFull) <- 0
-designNull <- matrix(0, nrow = J, ncol = J)
+designfull <- matrix(1, nrow = J, ncol = J)
+diag(designfull) <- 0
+designnull <- matrix(0, nrow = J, ncol = J)
 nperms <- 20
 
 clust <- makeCluster(no_cores)
-clusterExport(clust, varlist=c("simData", "rmvnorm", "fc", "cov", "noise", "p_relevant", "p_irrelevant", "n", "J", "keepX", "designFull", "designNull"))
+clusterExport(clust, varlist=c("simData", "rmvnorm", "fc", "cov", "noise", "p_relevant", "p_irrelevant", "n", "J", "keepX", "designfull", "designnull"))
 result <- parLapply(clust, 1:nperms, function(x){
   library(mvtnorm)
   library(mixOmics)
   library(tidyverse)
   
   outputs <- list()
-  outputs$errFull <- outputs$errNull <- outputs$p_corDisFull <- outputs$p_unCorDisFull <- outputs$p_corNonDisFull <- outputs$p_unCorNonDisFull <- outputs$p_corDisNull <- outputs$p_unCorDisNull <- outputs$p_corNonDisNull <- outputs$p_unCorNonDisNull <-  matrix(0, nr = length(fc), nc = length(cov))
-  rownames(outputs$errFull) <- rownames(outputs$errNull) <- rownames(outputs$p_corDisFull) <- rownames(outputs$p_unCorDisFull) <- rownames(outputs$p_corNonDisFull) <- rownames(outputs$p_unCorNonDisFull) <- rownames(outputs$p_corDisNull) <- rownames(outputs$p_unCorDisNull) <- rownames(outputs$p_corNonDisNull) <- rownames(outputs$p_unCorNonDisNull) <- paste(rep("fc", length(fc)), fc, sep="_")
-  colnames(outputs$errFull) <- colnames(outputs$errNull) <- colnames(outputs$p_corDisFull) <- colnames(outputs$p_unCorDisFull) <- colnames(outputs$p_corNonDisFull) <- colnames(outputs$p_unCorNonDisFull) <- colnames(outputs$p_corDisNull) <- colnames(outputs$p_unCorDisNull) <- colnames(outputs$p_corNonDisNull) <- colnames(outputs$p_unCorNonDisNull) <- paste(rep("cov", length(cov)), cov, sep="_")
+  outputs$errfull <- outputs$errnull <- outputs$p_corDisfull <- outputs$p_unCorDisfull <- outputs$p_corNonDisfull <- outputs$p_unCorNonDisfull <- outputs$p_corDisnull <- outputs$p_unCorDisnull <- outputs$p_corNonDisnull <- outputs$p_unCorNonDisnull <-  matrix(0, nr = length(fc), nc = length(cov))
+  rownames(outputs$errfull) <- rownames(outputs$errnull) <- rownames(outputs$p_corDisfull) <- rownames(outputs$p_unCorDisfull) <- rownames(outputs$p_corNonDisfull) <- rownames(outputs$p_unCorNonDisfull) <- rownames(outputs$p_corDisnull) <- rownames(outputs$p_unCorDisnull) <- rownames(outputs$p_corNonDisnull) <- rownames(outputs$p_unCorNonDisnull) <- paste(rep("fc", length(fc)), fc, sep="_")
+  colnames(outputs$errfull) <- colnames(outputs$errnull) <- colnames(outputs$p_corDisfull) <- colnames(outputs$p_unCorDisfull) <- colnames(outputs$p_corNonDisfull) <- colnames(outputs$p_unCorNonDisfull) <- colnames(outputs$p_corDisnull) <- colnames(outputs$p_unCorDisnull) <- colnames(outputs$p_corNonDisnull) <- colnames(outputs$p_unCorNonDisnull) <- paste(rep("cov", length(cov)), cov, sep="_")
   
   for(i in 1:length(fc)){
     for(j in 1:length(cov)){
       data <- simData(fc=fc[i], noise, J, n, p_relevant, p_irrelevant, cov=cov[j])
       
-      ## Full design (diag0)
-      resultFull = block.splsda(X = data$data, Y = data$Y, ncomp = 1, keepX = keepX, design = designFull)
-      diabloFullPanels <- selectVar(resultFull)[1:J] %>% lapply(., function(i){ i[[1]] }) %>% unlist(.)
-      diabloFullPanels <- unlist(lapply(strsplit(as.character(diabloFullPanels), "_"), function(i) i[1]))
-      outputs$p_corDisFull[i, j] <- length(grep("corDis", diabloFullPanels))
-      outputs$p_unCorDisFull[i, j] <- length(grep("unCorDis", diabloFullPanels))
-      outputs$p_corNonDisFull[i, j] <- length(grep("corNonDis", diabloFullPanels))
-      outputs$p_unCorNonDisFull[i, j] <- length(grep("unCorNonDis", diabloFullPanels))
-      cv.full <- perf(resultFull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
-      outputs$errFull[i, j] <- cv.full$WeightedPredict.error.rate["Overall.ER", ]
+      ## full design (diag0)
+      resultfull = block.splsda(X = data$data, Y = data$Y, ncomp = 1, keepX = keepX, design = designfull)
+      diablofullPanels <- selectVar(resultfull)[1:J] %>% lapply(., function(i){ i[[1]] }) %>% unlist(.)
+      diablofullPanels <- unlist(lapply(strsplit(as.character(diablofullPanels), "_"), function(i) i[1]))
+      outputs$p_corDisfull[i, j] <- length(grep("corDis", diablofullPanels))
+      outputs$p_unCorDisfull[i, j] <- length(grep("unCorDis", diablofullPanels))
+      outputs$p_corNonDisfull[i, j] <- length(grep("corNonDis", diablofullPanels))
+      outputs$p_unCorNonDisfull[i, j] <- length(grep("unCorNonDis", diablofullPanels))
+      cv.full <- perf(resultfull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
+      outputs$errfull[i, j] <- cv.full$WeightedPredict.error.rate["Overall.ER", ]
       
-      ## Null design
-      resultNull = block.splsda(X = data$data, Y = data$Y, ncomp = 1, keepX = keepX, design = designNull)
-      diabloNullPanels <- selectVar(resultNull)[1:J] %>% lapply(., function(i){ i[[1]] }) %>% unlist(.)
-      diabloNullPanels <- unlist(lapply(strsplit(as.character(diabloNullPanels), "_"), function(i) i[1]))
-      outputs$p_corDisNull[i, j] <- length(grep("corDis", diabloNullPanels))
-      outputs$p_unCorDisNull[i, j] <- length(grep("unCorDis", diabloNullPanels))
-      outputs$p_corNonDisNull[i, j] <- length(grep("corNonDis", diabloNullPanels))
-      outputs$p_unCorNonDisNull[i, j] <- length(grep("unCorNonDis", diabloNullPanels))
-      cv.null <- perf(resultNull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
-      outputs$errNull[i, j] <- cv.null$WeightedPredict.error.rate["Overall.ER", ]
+      ## null design
+      resultnull = block.splsda(X = data$data, Y = data$Y, ncomp = 1, keepX = keepX, design = designnull)
+      diablonullPanels <- selectVar(resultnull)[1:J] %>% lapply(., function(i){ i[[1]] }) %>% unlist(.)
+      diablonullPanels <- unlist(lapply(strsplit(as.character(diablonullPanels), "_"), function(i) i[1]))
+      outputs$p_corDisnull[i, j] <- length(grep("corDis", diablonullPanels))
+      outputs$p_unCorDisnull[i, j] <- length(grep("unCorDis", diablonullPanels))
+      outputs$p_corNonDisnull[i, j] <- length(grep("corNonDis", diablonullPanels))
+      outputs$p_unCorNonDisnull[i, j] <- length(grep("unCorNonDis", diablonullPanels))
+      cv.null <- perf(resultnull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
+      outputs$errnull[i, j] <- cv.null$WeightedPredict.error.rate["Overall.ER", ]
     }
   }
   outputs
@@ -253,27 +254,27 @@ result <- parLapply(clust, 1:nperms, function(x){
 stopCluster(clust)  
 ```
 
-### Full design
+### full design
 
 ```{r out.height="50%"}
 m <- list(l = 50,r = 0,b = 50,t = 25,pad = 4)
-### Full design (diag 0)
-zFull=(Reduce("+", result$errFull)/length(result$errFull))
-plot_ly(y=fc, x=cov,z=zFull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
+### full design (diag 0)
+zfull=(Reduce("+", result$errfull)/length(result$errfull))
+plot_ly(y=fc, x=cov,z=zfull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
   layout(
-    title = "Error rate, Full design, 1 component",
+    title = "Error rate, full design, 1 component",
     xaxis = list(title = "covariance between datasets"),
       yaxis = list(title = "fold-change"), margin=m)
 ```
 
-### Null design
+### null design
 
 ```{r out.height="50%"}
-### Null design
-zNull=(Reduce("+", result$errNull)/length(result$errNull))
-plot_ly(y=fc, x=cov,z=zNull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
+### null design
+znull=(Reduce("+", result$errnull)/length(result$errnull))
+plot_ly(y=fc, x=cov,z=znull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
   layout(
-    title = "Error rate, Null design, 1 component",
+    title = "Error rate, null design, 1 component",
     xaxis = list(title = "covariance between datasets"),
     yaxis = list(title = "fold-change"), margin=m)
 ```
@@ -282,91 +283,91 @@ plot_ly(y=fc, x=cov,z=zNull, type="contour", contours = list(showlabels = TRUE),
 
 ```{r}
 ### uncorDis
-p_unCorDisFull <- do.call(rbind, result$p_unCorDisFull) %>% 
+p_unCorDisfull <- do.call(rbind, result$p_unCorDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorDisFull[[1]]), length(result$p_unCorDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorDisfull[[1]]), length(result$p_unCorDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorDis", design = "Full")
+  mutate(varType = "unCorDis", design = "full")
 
-p_unCorDisNull <- do.call(rbind, result$p_unCorDisNull) %>% 
+p_unCorDisnull <- do.call(rbind, result$p_unCorDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorDisNull[[1]]), length(result$p_unCorDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorDisnull[[1]]), length(result$p_unCorDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorDis", design = "Null")
+  mutate(varType = "unCorDis", design = "null")
 
 ### corDis
-p_corDisFull <- do.call(rbind, result$p_corDisFull) %>% 
+p_corDisfull <- do.call(rbind, result$p_corDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corDisFull[[1]]), length(result$p_corDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_corDisfull[[1]]), length(result$p_corDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corDis", design = "Full")
+  mutate(varType = "corDis", design = "full")
 
-p_corDisNull <- do.call(rbind, result$p_corDisNull) %>% 
+p_corDisnull <- do.call(rbind, result$p_corDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corDisNull[[1]]), length(result$p_corDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_corDisnull[[1]]), length(result$p_corDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corDis", design = "Null")
+  mutate(varType = "corDis", design = "null")
 
 ### uncorNonDis
-p_unCorNonDisFull <- do.call(rbind, result$p_unCorNonDisFull) %>% 
+p_unCorNonDisfull <- do.call(rbind, result$p_unCorNonDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorNonDisFull[[1]]), length(result$p_unCorNonDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorNonDisfull[[1]]), length(result$p_unCorNonDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorNonDis", design = "Full")
+  mutate(varType = "unCorNonDis", design = "full")
 
-p_unCorNonDisNull <- do.call(rbind, result$p_unCorNonDisNull) %>% 
+p_unCorNonDisnull <- do.call(rbind, result$p_unCorNonDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorNonDisNull[[1]]), length(result$p_unCorNonDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorNonDisnull[[1]]), length(result$p_unCorNonDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorNonDis", design = "Null")
+  mutate(varType = "unCorNonDis", design = "null")
 
 ### corNonDis
-p_corNonDisFull <- do.call(rbind, result$p_corNonDisFull) %>% 
+p_corNonDisfull <- do.call(rbind, result$p_corNonDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corNonDisFull[[1]]), length(result$p_corNonDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_corNonDisfull[[1]]), length(result$p_corNonDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corNonDis", design = "Full")
+  mutate(varType = "corNonDis", design = "full")
 
-p_corNonDisNull <- do.call(rbind, result$p_corNonDisNull) %>% 
+p_corNonDisnull <- do.call(rbind, result$p_corNonDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corNonDisNull[[1]]), length(result$p_corNonDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_corNonDisnull[[1]]), length(result$p_corNonDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corNonDis", design = "Null")
+  mutate(varType = "corNonDis", design = "null")
 
-nVars <- rbind(p_unCorDisFull, p_unCorDisNull, p_corDisFull, p_corDisNull,
-  p_unCorNonDisFull,p_unCorNonDisNull, p_corNonDisFull, p_corNonDisNull)
+nVars <- rbind(p_unCorDisfull, p_unCorDisnull, p_corDisfull, p_corDisnull,
+  p_unCorNonDisfull,p_unCorNonDisnull, p_corNonDisfull, p_corNonDisnull)
 
 nVars %>% 
   mutate(cov = factor(cov), FC=gsub("fc_","FC=", fc)) %>% 
@@ -389,46 +390,46 @@ keepX <- list(rep(p_relevant/ncomp, ncomp), rep(p_relevant/ncomp, ncomp), rep(p_
 names(keepX) <- c("Dataset1", "Dataset2", "Dataset3")
 
 clust <- makeCluster(no_cores)
-clusterExport(clust, varlist=c("simData", "rmvnorm", "fc", "cov", "noise", "p_relevant", "p_irrelevant", "n", "J", "keepX", "designFull", "designNull", "ncomp"))
+clusterExport(clust, varlist=c("simData", "rmvnorm", "fc", "cov", "noise", "p_relevant", "p_irrelevant", "n", "J", "keepX", "designfull", "designnull", "ncomp"))
 result <- parLapply(clust, 1:nperms, function(x){
   library(mvtnorm)
   library(mixOmics)
   library(tidyverse)
   
   outputs <- list()
-  outputs$errFull <- outputs$errNull <- outputs$p_corDisFull <- outputs$p_unCorDisFull <- outputs$p_corNonDisFull <- outputs$p_unCorNonDisFull <- outputs$p_corDisNull <- outputs$p_unCorDisNull <- outputs$p_corNonDisNull <- outputs$p_unCorNonDisNull <-  matrix(0, nr = length(fc), nc = length(cov))
-  rownames(outputs$errFull) <- rownames(outputs$errNull) <- rownames(outputs$p_corDisFull) <- rownames(outputs$p_unCorDisFull) <- rownames(outputs$p_corNonDisFull) <- rownames(outputs$p_unCorNonDisFull) <- rownames(outputs$p_corDisNull) <- rownames(outputs$p_unCorDisNull) <- rownames(outputs$p_corNonDisNull) <- rownames(outputs$p_unCorNonDisNull) <- paste(rep("fc", length(fc)), fc, sep="_")
-  colnames(outputs$errFull) <- colnames(outputs$errNull) <- colnames(outputs$p_corDisFull) <- colnames(outputs$p_unCorDisFull) <- colnames(outputs$p_corNonDisFull) <- colnames(outputs$p_unCorNonDisFull) <- colnames(outputs$p_corDisNull) <- colnames(outputs$p_unCorDisNull) <- colnames(outputs$p_corNonDisNull) <- colnames(outputs$p_unCorNonDisNull) <- paste(rep("cov", length(cov)), cov, sep="_")
+  outputs$errfull <- outputs$errnull <- outputs$p_corDisfull <- outputs$p_unCorDisfull <- outputs$p_corNonDisfull <- outputs$p_unCorNonDisfull <- outputs$p_corDisnull <- outputs$p_unCorDisnull <- outputs$p_corNonDisnull <- outputs$p_unCorNonDisnull <-  matrix(0, nr = length(fc), nc = length(cov))
+  rownames(outputs$errfull) <- rownames(outputs$errnull) <- rownames(outputs$p_corDisfull) <- rownames(outputs$p_unCorDisfull) <- rownames(outputs$p_corNonDisfull) <- rownames(outputs$p_unCorNonDisfull) <- rownames(outputs$p_corDisnull) <- rownames(outputs$p_unCorDisnull) <- rownames(outputs$p_corNonDisnull) <- rownames(outputs$p_unCorNonDisnull) <- paste(rep("fc", length(fc)), fc, sep="_")
+  colnames(outputs$errfull) <- colnames(outputs$errnull) <- colnames(outputs$p_corDisfull) <- colnames(outputs$p_unCorDisfull) <- colnames(outputs$p_corNonDisfull) <- colnames(outputs$p_unCorNonDisfull) <- colnames(outputs$p_corDisnull) <- colnames(outputs$p_unCorDisnull) <- colnames(outputs$p_corNonDisnull) <- colnames(outputs$p_unCorNonDisnull) <- paste(rep("cov", length(cov)), cov, sep="_")
   
   for(i in 1:length(fc)){
     for(j in 1:length(cov)){
       data <- simData(fc=fc[i], noise, J, n, p_relevant, p_irrelevant, cov=cov[j])
       
-      ## Full design (diag0)
-      resultFull = block.splsda(X = data$data, Y = data$Y, ncomp = ncomp, keepX = keepX, design = designFull)
-      diabloFullPanels <- lapply(1:ncomp, function(i) {selectVar(resultFull, ncomp=i)[1:J] %>% 
+      ## full design (diag0)
+      resultfull = block.splsda(X = data$data, Y = data$Y, ncomp = ncomp, keepX = keepX, design = designfull)
+      diablofullPanels <- lapply(1:ncomp, function(i) {selectVar(resultfull, ncomp=i)[1:J] %>% 
           lapply(., function(j){ j[[1]]})
         }) %>% unlist(.)
-      diabloFullPanels <- unlist(lapply(strsplit(as.character(diabloFullPanels), "_"), function(i) i[1]))
-      outputs$p_corDisFull[i, j] <- length(grep("corDis", diabloFullPanels))
-      outputs$p_unCorDisFull[i, j] <- length(grep("unCorDis", diabloFullPanels))
-      outputs$p_corNonDisFull[i, j] <- length(grep("corNonDis", diabloFullPanels))
-      outputs$p_unCorNonDisFull[i, j] <- length(grep("unCorNonDis", diabloFullPanels))
-      cv.full <- perf(resultFull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
-      outputs$errFull[i, j] <- cv.full$WeightedPredict.error.rate["Overall.ER", ncomp]
+      diablofullPanels <- unlist(lapply(strsplit(as.character(diablofullPanels), "_"), function(i) i[1]))
+      outputs$p_corDisfull[i, j] <- length(grep("corDis", diablofullPanels))
+      outputs$p_unCorDisfull[i, j] <- length(grep("unCorDis", diablofullPanels))
+      outputs$p_corNonDisfull[i, j] <- length(grep("corNonDis", diablofullPanels))
+      outputs$p_unCorNonDisfull[i, j] <- length(grep("unCorNonDis", diablofullPanels))
+      cv.full <- perf(resultfull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
+      outputs$errfull[i, j] <- cv.full$WeightedPredict.error.rate["Overall.ER", ncomp]
       
-      ## Null design
-      resultNull = block.splsda(X = data$data, Y = data$Y, ncomp = ncomp, keepX = keepX, design = designNull)
-      diabloNullPanels <- lapply(1:ncomp, function(i) {selectVar(resultNull, ncomp=i)[1:J] %>% 
+      ## null design
+      resultnull = block.splsda(X = data$data, Y = data$Y, ncomp = ncomp, keepX = keepX, design = designnull)
+      diablonullPanels <- lapply(1:ncomp, function(i) {selectVar(resultnull, ncomp=i)[1:J] %>% 
           lapply(., function(j){ j[[1]]})
         }) %>% unlist(.)
-      diabloNullPanels <- unlist(lapply(strsplit(as.character(diabloNullPanels), "_"), function(i) i[1]))
-      outputs$p_corDisNull[i, j] <- length(grep("corDis", diabloNullPanels))
-      outputs$p_unCorDisNull[i, j] <- length(grep("unCorDis", diabloNullPanels))
-      outputs$p_corNonDisNull[i, j] <- length(grep("corNonDis", diabloNullPanels))
-      outputs$p_unCorNonDisNull[i, j] <- length(grep("unCorNonDis", diabloNullPanels))
-      cv.null <- perf(resultNull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
-      outputs$errNull[i, j] <- cv.null$WeightedPredict.error.rate["Overall.ER", ncomp]
+      diablonullPanels <- unlist(lapply(strsplit(as.character(diablonullPanels), "_"), function(i) i[1]))
+      outputs$p_corDisnull[i, j] <- length(grep("corDis", diablonullPanels))
+      outputs$p_unCorDisnull[i, j] <- length(grep("unCorDis", diablonullPanels))
+      outputs$p_corNonDisnull[i, j] <- length(grep("corNonDis", diablonullPanels))
+      outputs$p_unCorNonDisnull[i, j] <- length(grep("unCorNonDis", diablonullPanels))
+      cv.null <- perf(resultnull, validation = "Mfold", folds = 10, nrepeat = 1, progressBar = FALSE)
+      outputs$errnull[i, j] <- cv.null$WeightedPredict.error.rate["Overall.ER", ncomp]
     }
   }
   outputs
@@ -437,28 +438,28 @@ stopCluster(clust)
 
 ```
 
-### Full design
+### full design
 
 ```{r out.height="50%"}
 ## plot error rates
 m <- list(l = 50,r = 0,b = 50,t = 25,pad = 4)
-### Full design (diag 0)
-zFull=(Reduce("+", result$errFull)/length(result$errFull))
-plot_ly(y=fc, x=cov,z=zFull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
+### full design (diag 0)
+zfull=(Reduce("+", result$errfull)/length(result$errfull))
+plot_ly(y=fc, x=cov,z=zfull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
   layout(
-    title = "Error rate, Full design, 2 components",
+    title = "Error rate, full design, 2 components",
     xaxis = list(title = "covariance between datasets"),
       yaxis = list(title = "fold-change"), margin=m)
 ```
 
-### Null design
+### null design
 
 ```{r out.height="50%"}
-### Null design
-zNull=(Reduce("+", result$errNull)/length(result$errNull))
-plot_ly(y=fc, x=cov,z=zNull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
+### null design
+znull=(Reduce("+", result$errnull)/length(result$errnull))
+plot_ly(y=fc, x=cov,z=znull, type="contour", contours = list(showlabels = TRUE), colorscale = 'Jet') %>%
   layout(
-    title = "Error rate, Null design, 2 components",
+    title = "Error rate, null design, 2 components",
     xaxis = list(title = "covariance between datasets"),
     yaxis = list(title = "effect size"), margin=m)
 
@@ -468,91 +469,91 @@ plot_ly(y=fc, x=cov,z=zNull, type="contour", contours = list(showlabels = TRUE),
 
 ```{r}
 ### uncorDis
-p_unCorDisFull <- do.call(rbind, result$p_unCorDisFull) %>% 
+p_unCorDisfull <- do.call(rbind, result$p_unCorDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorDisFull[[1]]), length(result$p_unCorDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorDisfull[[1]]), length(result$p_unCorDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorDis", design = "Full")
+  mutate(varType = "unCorDis", design = "full")
 
-p_unCorDisNull <- do.call(rbind, result$p_unCorDisNull) %>% 
+p_unCorDisnull <- do.call(rbind, result$p_unCorDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorDisNull[[1]]), length(result$p_unCorDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorDisnull[[1]]), length(result$p_unCorDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorDis", design = "Null")
+  mutate(varType = "unCorDis", design = "null")
 
 ### corDis
-p_corDisFull <- do.call(rbind, result$p_corDisFull) %>% 
+p_corDisfull <- do.call(rbind, result$p_corDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corDisFull[[1]]), length(result$p_corDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_corDisfull[[1]]), length(result$p_corDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corDis", design = "Full")
+  mutate(varType = "corDis", design = "full")
 
-p_corDisNull <- do.call(rbind, result$p_corDisNull) %>% 
+p_corDisnull <- do.call(rbind, result$p_corDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corDisNull[[1]]), length(result$p_corDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_corDisnull[[1]]), length(result$p_corDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corDis", design = "Null")
+  mutate(varType = "corDis", design = "null")
 
 ### uncorNonDis
-p_unCorNonDisFull <- do.call(rbind, result$p_unCorNonDisFull) %>% 
+p_unCorNonDisfull <- do.call(rbind, result$p_unCorNonDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorNonDisFull[[1]]), length(result$p_unCorNonDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorNonDisfull[[1]]), length(result$p_unCorNonDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorNonDis", design = "Full")
+  mutate(varType = "unCorNonDis", design = "full")
 
-p_unCorNonDisNull <- do.call(rbind, result$p_unCorNonDisNull) %>% 
+p_unCorNonDisnull <- do.call(rbind, result$p_unCorNonDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_unCorNonDisNull[[1]]), length(result$p_unCorNonDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_unCorNonDisnull[[1]]), length(result$p_unCorNonDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "unCorNonDis", design = "Null")
+  mutate(varType = "unCorNonDis", design = "null")
 
 ### corNonDis
-p_corNonDisFull <- do.call(rbind, result$p_corNonDisFull) %>% 
+p_corNonDisfull <- do.call(rbind, result$p_corNonDisfull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corNonDisFull[[1]]), length(result$p_corNonDisFull))) %>% 
+  mutate(fc = rep(rownames(result$p_corNonDisfull[[1]]), length(result$p_corNonDisfull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corNonDis", design = "Full")
+  mutate(varType = "corNonDis", design = "full")
 
-p_corNonDisNull <- do.call(rbind, result$p_corNonDisNull) %>% 
+p_corNonDisnull <- do.call(rbind, result$p_corNonDisnull) %>% 
   as.data.frame() %>% 
-  mutate(fc = rep(rownames(result$p_corNonDisNull[[1]]), length(result$p_corNonDisNull))) %>% 
+  mutate(fc = rep(rownames(result$p_corNonDisnull[[1]]), length(result$p_corNonDisnull))) %>% 
   gather(cov, np, -fc) %>% 
   group_by(cov, fc) %>% 
   summarise(mean_np = mean(np), sd_np = sd(np)) %>% 
   ungroup %>% 
   mutate(cov = as.numeric(sapply(strsplit(cov, "_"), function(i) i[2]))) %>% 
-  mutate(varType = "corNonDis", design = "Null")
+  mutate(varType = "corNonDis", design = "null")
 
-nVars <- rbind(p_unCorDisFull, p_unCorDisNull, p_corDisFull, p_corDisNull,
-  p_unCorNonDisFull,p_unCorNonDisNull, p_corNonDisFull,  p_corNonDisNull)
+nVars <- rbind(p_unCorDisfull, p_unCorDisnull, p_corDisfull, p_corDisnull,
+  p_unCorNonDisfull,p_unCorNonDisnull, p_corNonDisfull,  p_corNonDisnull)
 
 nVars %>% 
   mutate(cov = factor(cov), FC=gsub("fc_","FC=", fc)) %>% 
