@@ -38,6 +38,10 @@ source(paste0(WhereAmI, "functions_connectivity_biologicalEnrichment.R"))
 load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/benchmarking/SNFdatasets.RDATA")
 load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/benchmarking/jive/jive_SNFdatasets.RDATA")
 load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/benchmarking/mofa/mofa_SNFdatasets.RDATA")
+
+## global variables
+superCol <- "#999999"
+unsuperCol <- "#F0E442"
 ```
 
 ## DIABLO identifies molecular networks with superior biological enrichment
@@ -368,14 +372,15 @@ names(mrna.mirna.cpg) <- names(mrna)
 
 # Component plots
 
-```{r multiOmicPanels_allcomponentplots, fig.path='Figures/', dev='png', fig.height = 12, fig.width = 13}
+```{r multiOmicPanels_allcomponentplots, fig.path='Figures/', dev='png', fig.height = 9, fig.width = 13}
 allscores <- rbind(do.call(rbind, snf_jive$pcs), do.call(rbind, snf_mofa$pcs), do.call(rbind, snf_sgcca$pcs), 
       do.call(rbind, snf_concat_splsda$pcs), do.call(rbind, snf_ensemble_splsda$pcs), 
   do.call(rbind, snf_diabloNull$pcs), do.call(rbind, snf_diabloFull$pcs)) %>% 
   as.data.frame %>% 
   mutate(Disease = rep(rep(names(snf_group), sapply(snf_group, length)), 7))
 
-allCompPlots <- ggplot(allscores, aes(x = PC1, y = PC2, group = pheno, color = pheno)) + geom_point() +
+allCompPlots <- filter(allscores, Disease != "colon") %>% 
+  ggplot(aes(x = PC1, y = PC2, group = pheno, color = pheno)) + geom_point() +
     facet_wrap(Disease ~ Method, scales = "free", ncol = 7) +
     stat_ellipse(level = 0.80) +
   customTheme(sizeStripFont = 10, xAngle = 0, hjust = 0.5, 
@@ -383,6 +388,92 @@ allCompPlots <- ggplot(allscores, aes(x = PC1, y = PC2, group = pheno, color = p
   xlab("Component 1") + ylab("Component 2")
 allCompPlots
 ```
+
+## colon component plot
+
+```{r multiOmicsPanels_compPlot_colon, fig.path='Figures/', dev='png', fig.height = 3.5, fig.width = 14}
+compPlot <- allscores %>% 
+  filter(Disease == "colon") %>% 
+  mutate(Method = factor(Method, c("DIABLO_full", "DIABLO_null", "Ensemble", "Concatenation", "sGCCA", "MOFA", "JIVE"))) %>% 
+  ggplot(aes(x = PC1, y = PC2, group = pheno, color = pheno)) + geom_point() +
+    facet_wrap(Disease ~ Method, scales = "free", ncol = 7) +
+    stat_ellipse(level = 0.80) +
+  customTheme(sizeStripFont = 10, xAngle = 0, hjust = 0.5, 
+              vjust = 0.5, xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
+  theme(rect = element_rect(fill = "transparent")) +
+  xlab("Component 1") +
+  ylab("Component 2")
+compPlot
+```
+
+# Silhouette coeffients per datasets per phenotype
+
+```{r}
+# function that calculates the silhouette coefficient based on a known cluster (i.e. protocol - batch or cell line)
+# calculates silhouette width average
+calc.sil = function(
+ x, # the PC variates
+ y1, y2 = NULL, # factor of interest, e.g. known batch info or known cell type
+ name.y1, name.y2 = NULL # character of the factor of interest
+){
+ library(cluster)
+ # calculate the distance, here euclidean is appropriate for PCA, NOT for t-SNE
+ dist.res = daisy(x, metric = 'euclidean')
+ # for factor 1
+ sil.batch.res1 = silhouette(x = as.numeric(y1), dist = dist.res)
+ # if factor 2 is provided
+ if(!is.null(y2))  sil.batch.res2 = silhouette(x = as.numeric(y2), dist = dist.res)
+ 
+ # extract average width silhouette per level
+ res1 = c(summary(sil.batch.res1)["clus.avg.widths"]$clus.avg.widths)
+ names(res1) = levels(y1)
+ if(!is.null(y2)){
+   res2 = c(summary(sil.batch.res2)["clus.avg.widths"]$clus.avg.widths)
+   names(res2) = levels(y2)
+ }
+ 
+ # output data for plotting
+ if(!is.null(y2)){
+   silh.coeff = c(res1, res2)
+   cluster = c(levels(y1), levels (y2))
+   type = c(rep(name.y1, nlevels(y1)), rep(name.y2, nlevels(y2)))
+ }else{
+   silh.coeff = c(res1)
+   cluster = c(levels(y1))
+   type = rep(name.y1, nlevels(y1))
+ }
+
+ data.plot = data.frame(silh.coeff, cluster, type)
+
+ 
+ return(invisible(data.plot))
+}
+
+```
+
+```{r}
+allscores <- rbind(do.call(rbind, snf_jive$pcs), do.call(rbind, snf_mofa$pcs), do.call(rbind, snf_sgcca$pcs), 
+      do.call(rbind, snf_concat_splsda$pcs), do.call(rbind, snf_ensemble_splsda$pcs), 
+  do.call(rbind, snf_diabloNull$pcs), do.call(rbind, snf_diabloFull$pcs)) %>% 
+  as.data.frame %>% 
+  mutate(Disease = rep(rep(names(snf_group), sapply(snf_group, length)), 7))
+
+allscores %>% 
+  group_by(Disease, Method) %>% 
+  nest() %>% 
+  mutate(sil = purrr::map(data, ~{
+    calc.sil(x = as.matrix(.[, c("PC1", "PC2")]), y1 = factor(.$pheno), y2 = NULL, name.y1 ="pheno", name.y2 = NULL)
+    })) %>% 
+  unnest(sil) %>% 
+  mutate(learning = ifelse(Method %in% c("JIVE", "MOFA", "sGCCA"), "Unsupervised", "Supervised")) %>% 
+  ggplot(aes(x = Method, y = silh.coeff, fill=cluster, color=cluster)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_grid(learning~Disease) +
+  customTheme(sizeStripFont = 15, xAngle = 30, hjust = 1, vjust = 1, xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
+  ylab("Silhouette coefficient")
+
+```
+
 
 # Overlap in panels
 
@@ -408,10 +499,9 @@ upset(colonInput, sets = colnames(colonInput), keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
       list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
-    column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
+    column = "type", colors = c(supervised = superCol, unsupervised = unsuperCol), 
     alpha = 0.5))))
 grid.text("Colon",x = 0.65, y=0.95, gp=gpar(fontsize=20))
-
 ```
 
 ### Venn diagram
@@ -442,7 +532,7 @@ upset(kidneyInput, sets = colnames(kidneyInput),  keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
       list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
-    column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
+    column = "type", colors = c(supervised = superCol, unsupervised = unsuperCol), 
     alpha = 0.5))))
 grid.text("Kidney",x = 0.65, y=0.95, gp=gpar(fontsize=20))
 
@@ -476,7 +566,7 @@ upset(gbmInput, sets = colnames(gbmInput), keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
       list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
-    column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
+    column = "type", colors = c(supervised = superCol, unsupervised = unsuperCol), 
     alpha = 0.5))))
 grid.text("GBM",x = 0.65, y=0.95, gp=gpar(fontsize=20))
 
@@ -510,7 +600,7 @@ upset(lungInput, sets = colnames(lungInput), keep.order = TRUE,
     queries = list(list(query = intersects, params = list("Concatenation","DIABLO_null","Ensemble"), active = TRUE, color = "#56B4E9"),
       list(query = intersects, params = list("JIVE","MOFA","sGCCA", "DIABLO_full"), active = TRUE, color = "#D55E00")),
   set.metadata = list(data = metadata, plots = list(list(type = "matrix_rows", 
-    column = "type", colors = c(supervised = "green", unsupervised = "purple"), 
+    column = "type", colors = c(supervised = superCol, unsupervised = unsuperCol), 
     alpha = 0.5))))
 grid.text("Lung",x = 0.65, y=0.95, gp=gpar(fontsize=20))
 
@@ -525,14 +615,6 @@ venn(lung_panels, zcolor = "style")
 # Gene set enrichment analysis
 
 Finally, we carried out gene set enrichment analysis on each multi-omics biomarker panel (using gene symbols of mRNAs and CpGs) against 10 gene set collections (see Methods) and tabulated the number of significant (FDR=5%) gene sets. The DIABLO_full model identified the greatest number of significant gene sets across the 10 gene set collections and generally ranked higher than the other methods in the colon (7 collections), gbm (5 collections) and lung (5 collections) cancer datasets, whereas JIVE outperformed all other methods in the kidney cancer datasets (6 collections). Unlike all other approaches considered, DIABLO_full, which aimed to explain both the correlation structure between multiple omics layers and a phenotype of interest, implicated the greatest number of known biological gene sets (pathways/functions/processes etc.). 
-
-
-```{r out.width="100%"}
-img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/benchmarking/Figures/Table2.png"
-include_graphics(img1_path)
-```
-
-*Overview of multi-omics datasets analyzed for method benchmarking and in two case studies. The breast cancer case study includes training and test datasets for all omics types except proteins.*
 
   * We wished to assess the enrichment of the selected features across a variety of annotated gene sets in the MSigDB collection (http://software.broadinstitute.org/gsea/msigdb), in particular:
 1. C1 - positional gene sets  for each human chromosome and cytogenetic band.
@@ -549,7 +631,8 @@ B. TISSUES - cell-specific expression from Benita et al. Blood 2008 http://www.b
 
   *  Significance of enrichment was determined using a hypergeometric test of the overlap between the selected features (mapped to official HUGO gene symbols or official miRNA symbols) and the various gene sets contained in the collections. Resulting p-values were corrected for multiple hypothesis using the Benjamini-Hochberg procedure applied across ALL genesets (10k+ tests – as pessimistic as possible). Adjusted p-values are reported in the fdr column.
 
-## mRNA and CpGs
+## All gene sets
+  * only using mRNA and CpGs
 
 ```{r gensetEnrichmentResults}
 enriched_sets <- rapply(mrna.cpg, function(i){
@@ -566,8 +649,8 @@ enrichedPathways <- do.call(rbind, enriched_sets) %>%
 enrichedPathways$type <- "supervised"
 enrichedPathways$type[enrichedPathways$method %in% c("JIVE", "MOFA", "sGCCA")] <- "unsupervised"
 
-enrichedPathways %>% 
-  spread(collection, sig)
+kable(enrichedPathways %>% 
+  spread(collection, sig))
 
 sigPathways_cancer_db <- enrichedPathways %>%
   dplyr::select(-type) %>% 
@@ -585,6 +668,17 @@ rbind(sigPathways_cancer_db, sigPathways_cancer) %>%
   write.csv(., paste0(WhereAmI, "/Tables/multiOmicPanels_biologicalEnrichment.csv"))
 
 ```
+
+## All gene sets combined
+  * only using mRNA and CpGs
+  
+```{r}
+kable(enrichedPathways %>% 
+  group_by(disease, method) %>% 
+    summarise(count = sum(sig)) %>% 
+    spread(disease, count))
+```
+
 
 ### which method is leads to the greatest number of signficant pathways?
 
@@ -641,9 +735,8 @@ cormat_pearson <- lapply(multiOmicPanels, function(i){
 
 ```
 
-## datasets of multi-omic panels
-
 ```{r}
+## datasets of multi-omic panels
 data <- multiOmicPanels %>%
   purrr::map(~ {                  # for every model
     purrr::map2(., snf_data, ~ {  # for every experiment
@@ -652,21 +745,19 @@ data <- multiOmicPanels %>%
       })
     })
   })
-names(data)
 
 # combine
 data <- purrr::modify_depth(data, 2, purrr::reduce, cbind)
 ```
 
-## adjacency matrices
-
 ```{r}
+## adjacency matrices
 adj <- modify_depth(data, 2, cor)
 ```
 
 ## Number of connections
 
-```{r multiOmicsPanels_nConnections, fig.path='Figures/', dev='png', fig.height = 4, fig.width = 14}
+```{r multiOmicsPanels_nConnections, fig.path='Figures/', dev='png', fig.height = 5, fig.width = 12}
 cor_mat <- cormat_pearson
 plots <- list()
 
@@ -687,15 +778,44 @@ nConnectionsDat <- cor_mat %>%
 nConnectionsDat$type <- "supervised"
 nConnectionsDat$type[nConnectionsDat$model %in% c("JIVE", "MOFA", "sGCCA")] <- "unsupervised"
 
-nconnections <- ggplot(nConnectionsDat, aes(x=cor,y=nConnections,fill=model,color=model,linetype=type)) +
+nconnections <- nConnectionsDat %>% 
+  filter(dataset != "colon") %>% 
+  mutate(label = if_else(cor == min(cor), as.character(model), NA_character_)) %>% 
+  ggplot(aes(x=cor,y=nConnections,fill=type,color=type,linetype=model)) +
   geom_line(size=1)+
   facet_wrap(~dataset, nr=1) +
   customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
               xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
   xlab("Absolute correlation coefficient cut-off") +
-  ylab("Number of edges")
+  ylab("Number of edges") +
+  scale_fill_manual(values=c(superCol, unsuperCol)) +
+  scale_color_manual(values=c(superCol, unsuperCol)) +
+  geom_label_repel(aes(label = label),color="black",
+                  nudge_x = 0,
+                  na.rm = TRUE)
 nconnections
 
+```
+
+### Colon only
+
+```{r colon_connectivity, fig.path='Figures/', dev='png', fig.height = 5, fig.width = 8}
+nConnectionsDat %>% 
+  filter(dataset == "colon") %>% 
+  mutate(label = if_else(cor == min(cor), as.character(model), NA_character_)) %>% 
+  ggplot(aes(x=cor,y=nConnections,fill=type,color=type,linetype=model)) +
+  geom_line(size=1)+
+  facet_wrap(~dataset, nr=1) +
+  customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
+              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
+  xlab("Absolute correlation coefficient cut-off") +
+  ylab("Number of edges") +
+  scale_fill_manual(values=c(superCol, unsuperCol)) +
+  scale_color_manual(values=c(superCol, unsuperCol)) +
+  geom_label_repel(aes(label = label),color="black",
+                  nudge_x = 0,
+                  na.rm = TRUE) +
+  theme(legend.position = c(0.75, 0.7))
 ```
 
 # Network attributes
@@ -736,19 +856,26 @@ attributesDat <- do.call(rbind, df_list) %>%
 attributesDat$type <- "supervised"
 attributesDat$type[attributesDat$model %in% c("JIVE", "MOFA", "sGCCA")] <- "unsupervised"
 
-netAttributes <- ggplot(attributesDat, aes(x = cor_cutoff, y = value, fill = model, color = model, linetype = type)) +
+netAttributes <- attributesDat %>% 
+   mutate(label = if_else(cor_cutoff == min(cor_cutoff), as.character(model), NA_character_)) %>% 
+  ggplot(aes(x = cor_cutoff, y = value, fill = type, color = type, linetype = model)) +
   geom_point()+
   geom_line()+
   facet_grid(attributes ~ data, scales = "free") +
   customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
-              xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10)
+               xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
+  scale_fill_manual(values=c(superCol, unsuperCol)) +
+  scale_color_manual(values=c(superCol, unsuperCol)) +
+  geom_label_repel(aes(label = label),color="black",
+                  nudge_x = 0,
+                  na.rm = TRUE)
 netAttributes
 
 ```
 
 ## all network plots
 
-```{r multiOmicsPanels_networks, fig.path='Figures/', dev='png', fig.height = 10, fig.width = 12}
+```{r multiOmicsPanels_networks, fig.path='Figures/', dev='png', fig.height = 10, fig.width = 15}
 df <- cor_mat %>%
 modify_depth(2, ~ tibble(adj = I(list(.)))) %>%
 purrr::map(bind_rows, .id = 'data') %>%
@@ -805,7 +932,7 @@ r3
 })
 names(nets) <- unique(df$data)
 
-p <- plot_grid(nets$colon, nets$kidney, nets$gbm, nets$lung, nrow = 4, ncol = 1, labels = c('', ''))
+p <- plot_grid(nets$gbm, nets$kidney, nets$lung, nrow = 3, ncol = 1, labels = c('', ''))
 p
 
 ```
@@ -818,23 +945,6 @@ The plots below depict the networks of all multi-omics biomarker panels for the 
 
 ```{r multiOmicsPanels_networks_colon, fig.path='Figures/', dev='png', fig.height = 6, fig.width = 14}
 nets$colon
-```
-
-## colon component plot
-
-```{r multiOmicsPanels_compPlot_colon, fig.path='Figures/', dev='png', fig.height = 3.5, fig.width = 14}
-compPlot <- allscores %>% 
-  filter(Disease == "colon") %>% 
-  mutate(Method = factor(Method, c("DIABLO_full", "DIABLO_null", "Ensemble", "Concatenation", "sGCCA", "MOFA", "JIVE"))) %>% 
-  ggplot(aes(x = PC1, y = PC2, group = pheno, color = pheno)) + geom_point() +
-    facet_wrap(Disease ~ Method, scales = "free", ncol = 7) +
-    stat_ellipse(level = 0.80) +
-  customTheme(sizeStripFont = 10, xAngle = 0, hjust = 0.5, 
-              vjust = 0.5, xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
-  xlab("Component 1") +
-  ylab("Component 2")
-compPlot
-
 ```
 
 ## References
