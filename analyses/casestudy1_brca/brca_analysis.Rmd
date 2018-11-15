@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRU
 WhereAmI <- "~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/"
 
 ## load libraries
+require(parallel)
 library(knitr)
 library(cowplot)
 library(tidyverse)
@@ -32,9 +33,216 @@ library(RColorBrewer)
 
 ## load data
 load("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/trainTestDatasetsNormalized.RDATA")
+source("~/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/casestudy1_brca/brcaFunctions.R")
 ```
 
-## DIABLO identified known and novel multi-omics biomarkers of breast cancer subtypes
+# Analysis 1: Comparison of classification performance between DIABLO models and other classification schemes (Concatecation and Ensemble) - only using mRNA, miRNA and CpGs
+
+## Number of samples and variables per dataset
+
+```{r, results = 'hide'}
+Y.train <- droplevels(pam50Train0$Call)
+names(Y.train) <- rownames(pam50Train0)
+table(Y.train)
+X.train <- list(mRNA = mrnaTrain0, miRNA = mirnaTrain0, CpGs = methTrain0, Proteins = protTrain0)
+all(names(Y.train) == rownames(X.train[[1]]))
+all(names(Y.train) == rownames(X.train[[2]]))
+all(names(Y.train) == rownames(X.train[[3]]))
+all(names(Y.train) == rownames(X.train[[4]]))
+
+Y.test <- droplevels(pam50Test0$Call)
+names(Y.test) <- rownames(pam50Test0)
+table(Y.test)
+X.test <- list(mRNA = mrnaTest0, miRNA = mirnaTest0, CpGs = methTest0)
+all(names(Y.test) == rownames(X.test[[1]]))
+all(names(Y.test) == rownames(X.test[[2]]))
+all(names(Y.test) == rownames(X.test[[3]]))
+```
+
+```{r}
+sapply(X.train, dim) %>% 
+  as.data.frame %>% 
+  mutate(Attribute = c("Number of Samples", "Number of features"))
+```
+
+## Phenotype breakdown
+
+```{r}
+table(Y.train)
+```
+
+## Tune DIABLO models
+
+```{r}
+# folds <- 5; nrepeat <- 5; cpus <- 8;
+# ## null design
+# designnull <- matrix(0, nrow = length(X.test), ncol = length(X.test))
+# rownames(designnull) <- colnames(designnull) <- names(X.test)
+# test.keepX = list(mRNA = c(2, 5, 10, 15, 20), miRNA = c(2, 5, 10, 15, 20), CpGs = c(2, 5, 10, 15, 20))
+# ncomp = 3
+# t1 <- proc.time()
+# tune = tune.block.splsda(X = X.train[names(X.test)], Y = Y.train, ncomp = ncomp, test.keepX = test.keepX, dist = "centroids.dist",
+#                           design = designnull, validation = "Mfold", folds = folds, nrepeat = nrepeat, cpus = cpus)
+# t2 <- proc.time()
+# (t2-t1)/60 # 39.5 minutes
+# saveRDS(tune, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune_nullDesign.rds")
+diablonullDesign <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune_nullDesign.rds")
+
+## full design
+# designfull <- matrix(1, nrow = length(X.test), ncol = length(X.test))
+# rownames(designfull) <- colnames(designfull) <- names(X.test)
+# diag(designfull) <- 0
+# t1 <- proc.time()
+# tune = tune.block.splsda(X = X.train[names(X.test)], Y = Y.train, ncomp = ncomp, test.keepX = test.keepX, dist = "centroids.dist",
+#                           design = designfull, validation = "Mfold", folds = folds, nrepeat = nrepeat, cpus = cpus)
+# t2 <- proc.time()
+# (t2-t1)/60 # 42.1 minutes
+# saveRDS(tune, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune_fullDesign.rds")
+diablofullDesign <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune_fullDesign.rds")
+```
+
+## estimate DIABLO train and test error rates
+
+```{r}
+# ncomp = 3;
+# X_train <- X.train[names(X.test)]
+# y_train <- Y.train
+# X_test <- X.test
+# y_test <- Y.test
+# folds <- 5; iter <- 5;
+# 
+# ## DIABLO null
+# keepX = diablonullDesign$choice.keepX[names(X.test)]
+# diablonull_perf <- diabloFit(keepX, ncomp, X_train, X_test, y_train, y_test, design=designnull, folds, iter, modName="DIABLO_null")
+# saveRDS(diablonull_perf, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/diablonull_perf.rds")
+diablonull_perf <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/diablonull_perf.rds")
+
+# ## DIABLO full
+# keepX = diablofullDesign$choice.keepX[names(X.test)]
+# diablofull_perf <- diabloFit(keepX, ncomp, X_train, X_test, y_train, y_test, design=designfull, folds, iter, modName="DIABLO_full")
+# saveRDS(diablofull_perf, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/diablofull_perf.rds")
+diablofull_perf <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/diablofull_perf.rds")
+```
+
+## Tune sPLSDA models
+
+```{r}
+# Concatenation
+# X_train <- do.call(cbind, X.train[names(X.test)])
+# colnames(X_train) <- paste(rep(names(X.test), sapply(X.test, ncol)), unlist(sapply(X.test, colnames)), sep="_")
+# y_train <- Y.train
+# t1 <- proc.time()
+# tune= tune(method = "splsda", X_train, y_train, ncomp=ncomp, logratio="none",
+#     test.keepX = c(2, 5, 10, 15, 20), dist="centroids.dist", progressBar = TRUE, folds = folds, nrepeat = nrepeat)
+# t2 <- proc.time()
+# (t2-t1)/60 # 5.6 minutes
+# saveRDS(tune, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/splsdaConcat.rds")
+splsdaConcat <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/splsdaConcat.rds")
+
+# Ensemble
+# X_train <- X.train[names(X.test)]
+# y_train <- Y.train
+# X_test <- X.test
+# y_test <- Y.test
+# t1 <- proc.time()
+# tune_singleOmics_splsda <- lapply(X_train, function(i){
+#   tune(method = "splsda", i, y_train, ncomp=ncomp, logratio="none",
+#     test.keepX = c(2, 5, 10, 15, 20), dist="centroids.dist", progressBar = FALSE, folds = folds, nrepeat = nrepeat)
+# })
+# t2 <- proc.time()
+# (t2-t1)/60 # 6.1 minutes
+# saveRDS(tune_singleOmics_splsda, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/tune_singleOmics_splsda.rds")
+tune_singleOmics_splsda <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/tune_singleOmics_splsda.rds")
+```
+
+## estimate sPLSDA train and test error rates (Concateantion and Ensemble)
+
+```{r}
+# ## Concatenation
+# modName = "Concatenation_sPLSDA"
+# keepX <- splsdaConcat$choice.keepX
+# X_train <- do.call(cbind, X.train[names(X.test)])
+# X_test <- do.call(cbind, X.test)
+# colnames(X_train) <- colnames(X_test) <- paste(rep(names(X.test), sapply(X.test, ncol)), unlist(sapply(X.test, colnames)), sep="_")
+# concatSplsda_perf <- concatSplsdaFit(keepX, ncomp, X_train, X_test, y_train, y_test, folds, iter, modName)
+# saveRDS(concatSplsda_perf, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/concatSplsda_perf.rds")
+concatSplsda_perf <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/concatSplsda_perf.rds")
+
+# ## Ensemble
+# modName = "Ensemble_sPLSDA"
+# keepX <- lapply(tune_singleOmics_splsda, function(i) i$choice.keepX)
+# all(names(keepX) == names(X_test))  # check order datasets
+# X_train <- X.train; y_train <- Y.train; X_test <- X.test; y_test <- Y.test;
+# ensembleSplsda_perf <- ensembleSplsdaFit(keepX, ncomp, X_train, X_test, y_train, y_test, folds, iter, modName)
+# saveRDS(ensembleSplsda_perf, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/ensembleSplsda_perf.rds")
+ensembleSplsda_perf <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/ensembleSplsda_perf.rds")
+
+```
+
+## tune and estimate Enet train and test error rates (Concateantion and Ensemble)
+
+```{r}
+# penalties <- seq(0.01, 0.1, length.out = 10)
+# modName <- "Concatenation_Enet";
+# X_train=do.call(cbind, X.train[names(X.test)]);
+# X_test=do.call(cbind, X.test)
+# colnames(X_train) <- colnames(X_test) <- paste(rep(names(X.test), sapply(X.test, ncol)), colnames(X_test), sep="_")
+# y_train=Y.train
+# y_test=Y.test
+# # Concatenation
+# concatEnet_perf <- concatEnetFit(X_train, X_test, y_train, y_test, penalties, folds, iter, modName)
+# saveRDS(concatEnet_perf, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/concatEnet_perf.rds")
+concatEnet_perf <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/concatEnet_perf.rds")
+
+# ## Ensemble
+# modName <- "Ensemble_Enet";
+# X_train <- X.train[names(X.test)]
+# X_test <- X.test
+# ensembleEnet_perf <- ensembleEnetFit(X_train, X_test, y_train, y_test, penalties, folds, iter, modName)
+# saveRDS(ensembleEnet_perf, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/ensembleEnet_perf.rds")
+ensembleEnet_perf <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/ensembleEnet_perf.rds")
+
+```
+
+## plot of error rates
+
+```{r perf_comparison, fig.path='Figures/', dev='png', fig.height = 6, fig.width = 10}
+rbind(diablonull_perf$error, diablofull_perf$error, concatSplsda_perf$error, ensembleSplsda_perf$error, concatEnet_perf$error, ensembleEnet_perf$error) %>% 
+  mutate(cohort = gsub("train", "train (5x5-fold CV)", cohort)) %>% 
+  mutate(cohort = gsub("test", "test (off-the-self)", cohort)) %>% 
+  ggplot(aes(x = modName, y = mean_err, fill = cohort, color = cohort)) +
+  theme(panel.grid.minor = element_line(colour="grey", size=0.5)) +
+  geom_errorbar(aes(ymin = mean_err-sd_err, ymax = mean_err+sd_err), width=0.5, position = position_dodge(width = 0.5)) +
+  geom_point(size=2, position = position_dodge(width = 0.5)) +
+  ylim(c(0, 0.5)) + 
+  customTheme(sizeStripFont = 15, xAngle = 30, hjust = 1, vjust = 1, xSize = 10, ySize = 10, xAxisSize = 10, yAxisSize = 10) +
+  ylab("Balanced Error Rate (BER)") +
+  xlab("Integrative methods")
+```
+
+## table of error rates
+
+```{r}
+errRates <- rbind(diablonull_perf$error, diablofull_perf$error, concatSplsda_perf$error, ensembleSplsda_perf$error, concatEnet_perf$error, ensembleEnet_perf$error) %>% 
+  mutate(mean_err = signif(mean_err, 2),
+    sd_err = signif(sd_err, 2))
+kable(errRates)
+
+write.csv(errRates,
+  "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaMethodsErrorRates.csv")
+```
+
+## numberof variables in each panel
+
+```{r}
+panelFeatures <- rbind(diablonull_perf$panels, diablofull_perf$panels, concatSplsda_perf$panels, ensembleSplsda_perf$panels, concatEnet_perf$panels, ensembleEnet_perf$panels)
+kable(panelFeatures %>% spread(dataset, panelLength))
+
+write.csv(panelFeatures %>% spread(dataset, panelLength),
+  "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaMethodsPanelSizes.csv")
+```
+
+# Analysis 2: DIABLO identified known and novel multi-omics biomarkers of breast cancer subtypes - using mRNA, miRNA, CpGs and proteins
 
 We next demonstrate that DIABLO can identify novel biomarkers in addition to biomarkers with known biological associations using a case study of human breast cancer. We applied our biomarker analysis workflow to breast cancer datasets to characterize and predict PAM50 breast cancer subtypes. 
 
@@ -61,52 +269,25 @@ img1_path <- "/Users/asingh/Dropbox/PROOF/Manuscript/mixOmics/diablo/analyses/ca
 include_graphics(img1_path)
 ```
 
-*Breast cancer multi omics study: optimal multi-omics biomarker panel for PAM50 subtypes. A grid was used to identify the optimal combination of variables select from each omics datasets. The following grid values was used for each omics dataset: mRNA = [5, 10, 15, 20], miRNA = [5, 10, 15, 20], CpGs = [5, 10, 15, 20], Proteins = [5, 10, 15, 20], across 3 components. The centroids distance measure was used to compute the error rate26. The optimal multi-omics panel consisted of 20 mRNAs, 20 miRNAs, 15 CpGs and 15 proteins on component 1, 5 mRNAs, 5 miRNAs, 5 CpGs and 20 proteins on component 2, and 20 mRNAs, 20 miRNAs, 5 CpGs and 20 proteins on component 3.*
+*Breast cancer multi omics study: optimal multi-omics biomarker panel for PAM50 subtypes. A grid was used to identify the optimal combination of variables select from each omics datasets. The following grid values was used for each omics dataset: mRNA = [5, 10, 15, 20], miRNA = [5, 10, 15, 20], CpGs = [5, 10, 15, 20], Proteins = [5, 10, 15, 20], across 3 components. The centroids distance measure was used to compute the error rate. The optimal multi-omics panel consisted of 20 mRNAs, 20 miRNAs, 15 CpGs and 15 proteins on component 1, 5 mRNAs, 5 miRNAs, 5 CpGs and 20 proteins on component 2, and 20 mRNAs, 20 miRNAs, 5 CpGs and 20 proteins on component 3.*
 
-The number of variables that resulted in the minimum balanced error rate were retained as previously described in [12]. 
-
-## Number of samples and variables per dataset
-
-```{r, results = 'hide'}
-Y.train <- droplevels(pam50Train0$Call)
-names(Y.train) <- rownames(pam50Train0)
-table(Y.train)
-X.train <- list(mRNA = mrnaTrain0, miRNA = mirnaTrain0, CpGs = methTrain0, Proteins = protTrain0)
-all(names(Y.train) == rownames(X.train[[1]]))
-all(names(Y.train) == rownames(X.train[[2]]))
-all(names(Y.train) == rownames(X.train[[3]]))
-all(names(Y.train) == rownames(X.train[[4]]))
-```
-
-```{r}
-sapply(X.train, dim) %>% 
-  as.data.frame %>% 
-  mutate(Attribute = c("Number of Samples", "Number of features"))
-```
-
-## Phenotype breakdown
-
-```{r}
-table(Y.train)
-```
-
-## Tune DIABLO model
+## tuning a DIABLO_full model using 4 datasets
 
 ```{r optimal_errorRate_tuneFunction_mixOmics, fig.path='Figures/', dev='png', fig.height = 10, fig.width = 20}
 ## design matrix
 design <- matrix(1, nrow = length(X.train), ncol = length(X.train))
 rownames(design) <- colnames(design) <- names(X.train)
 diag(design) <- 0
-test.keepX = list(mRNA = c(5, 10, 15, 20), miRNA = c(5, 10, 15, 20), CpGs = c(5, 10, 15, 20), Proteins = c(5, 10, 15, 20))
+# test.keepX = list(mRNA = c(5, 10, 15, 20), miRNA = c(5, 10, 15, 20), CpGs = c(5, 10, 15, 20), Proteins = c(5, 10, 15, 20))
+# 
+# t1 <- proc.time()
+# tune = tune.block.splsda(X = X.train, Y = Y.train, ncomp = 3, test.keepX = test.keepX, dist = "centroids.dist",
+#                           design = design, validation = "Mfold", folds = 5, nrepeat = 5, cpus = 5)
+# t2 <- proc.time()
+# (t2-t1)/60 #  minutes
+# saveRDS(tune, "~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune_caseStudy.rds")
 
-#t1 <- proc.time()
-#tune = tune.block.splsda(X = X.train, Y = Y.train, ncomp = 3, test.keepX = test.keepX, dist = "centroids.dist",
-#                          design = design, validation = "Mfold", folds = 5, nrepeat = 5, cpus = 5)
-#t2 <- proc.time()
-#(t2-t1)/60 # 77.3640000 minutes
-#saveRDS(tune, "~/Dropbox/Manuscript/diablo_datasets/brca/brcaPanel_tune.rds")
-
-tune <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune.rds")
+tune <- readRDS("~/Dropbox/PROOF/Manuscript/mixOmics/diablo_datasets/brca/brcaPanel_tune_caseStudy.rds")
 
 ## Component 1
 p1 <- data.frame(mean = tune$error.rate[, "comp1"], sd = tune$error.rate.sd[, "comp1"]) %>% 
@@ -192,6 +373,10 @@ tune$choice.keepX
 ## run DIABLO - with optimal keepX
 
 ```{r}
+## design matrix
+design <- matrix(1, nrow = length(X.train), ncol = length(X.train))
+rownames(design) <- colnames(design) <- names(X.train)
+diag(design) <- 0
 ncomp <- 3
 keepX = tune$choice.keepX
 
@@ -424,7 +609,8 @@ p1 <- filter(varDat.test, Dataset == "Consensus") %>%
               xSize = 20, ySize = 20, xAxisSize = 20, yAxisSize = 20) +
   xlab("Component 1") + ylab("Component 2") + 
   theme(strip.text.x = element_text(size=26, face = "bold")) + 
-  scale_color_manual(values=color.mixo(1:4))
+  scale_color_manual(values=color.mixo(1:4)) +
+  annotate("text", x = -1.5, y = -3.5, label = "Ellipses: training data \n points: test data", size =8)
 
 p2 <- filter(varDat.test, Dataset != "Consensus") %>% 
   ggplot(aes(x = `comp 1`, y = `comp 2`, color = Class)) + 
@@ -486,7 +672,7 @@ mark.groups <- mark.groups[sapply(mark.groups, length) > 3]
 mark.col <- rainbow(length(mark.groups), alpha=.5)
 plot(net, edge.curved=.2, vertex.label.cex=0.01, vertex.size=6, mark.groups=mark.groups, 
   mark.col=mark.col, vertex.label.color="black") 
-legend("bottomleft", names(diabloPanel), col=unique(V(net)$color), pch = 19, bty="n")
+legend("bottomleft", names(diabloPanel), col=unique(V(net)$color), pch = 19, bty="n", cex = 1.5)
 ```
 
 ### Number of variables of each omic-type in the red cluster
@@ -519,9 +705,9 @@ enrichment %>% ungroup %>%
   coord_flip() +
   customTheme(sizeStripFont = 15, xAngle = 0, hjust = 0.5, vjust = 0.5, 
     xSize = 20, ySize = 9, xAxisSize = 20, yAxisSize = 20) +
-  theme(legend.position = c(0.55,0.1)) +
+  theme(legend.position = c(0.45,0.1)) +
   ylab("Gene sets") +
-  xlab(expression("Significance (-log"[10]~"FDR)"))
+  xlab("Signficant Geneset at FDR=5%")
 
 ```
 
