@@ -56,7 +56,7 @@ include_graphics(img1_path)
 
 > **Integrative prediction frameworks including multi-step approaches (concatenation, ensemble) and DIABLO to identify multi-omics molecular signatures.** Concatenation-based integration combines multiple datasets into a single large dataset, with the aim to predict a phenotype of interest. Ensemble-based classification methods construct a predictive model on each individual dataset before combining the model predictions. None of these approaches account or model relationships between datasets and thus limit our understanding of molecular interactions at multiple functional levels. DIABLO simultaneously maximizes the associations between datasets and a phenotype of interest to identify a correlated set of variables of different omics-types that are also discriminatory. The prediction is based on each omics-associated component derived from the model (see Supplementary Note). All methods presented here are data-driven approaches, which do not use any prior knowledge such as from curated biological databases (eg. protein-protein interactions).
 
-```{r simulationResults, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 16.5}
+```{r simulationResults_supplement, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 16.5}
 J <- 3
 fcSeq <- c(0, 1, 2)
 noiseSeq <- c(0.2, 0.5, 1)
@@ -153,31 +153,30 @@ result <- parLapply(clust, 1:nperms, function(x){
 stopCluster(clust) 
 
 ## Error rates
-errorRates <- do.call(rbind, result$err)  %>% 
+errorRatesDat <- do.call(rbind, result$err)  %>% 
     mutate(Classifier = factor(Classifier, 
-    levels = c("Concatenation", "DIABLO_null", "DIABLO_full", "Ensemble"))) %>% 
-  group_by(Classifier, FC, Noise) %>% 
-  summarise(Mean = mean(error), SD = sd(error)) %>% 
-  ungroup %>% 
-  mutate(FC = gsub("FC_", "FC=", FC), Noise = gsub("Noise_", "Noise=", Noise)) %>% 
-  ggplot(aes(x = Classifier, y = Mean)) +
-  geom_bar(stat = "identity") + 
-  geom_errorbar(aes(ymin = Mean-SD, ymax = Mean+SD)) +
-  facet_grid(FC ~ Noise) +
+    levels = c("Concatenation", "DIABLO_null", "DIABLO_full", "Ensemble"))) %>%
+  mutate(FC = gsub("FC_", "FC=", FC), Noise = gsub("Noise_", "Noise=", Noise))
+errorRates <- errorRatesDat %>% 
+  ggplot(aes(x = Classifier, y = error, fill=Noise)) +
+  geom_boxplot() +
+  scale_fill_manual(values=c("#F0F0F0", "#BDBDBD", "#737373")) + 
+  facet_grid(FC ~ Noise, scales = "free") +
   customTheme(sizeStripFont = 20, xAngle = -45, hjust = 0, vjust = 1, 
               xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) +
   ylab("Mean±SD of error rate \n 10-fold cross-validation over 20 simulations") +
   xlab("Integrative Classifiers") +
-  geom_hline(yintercept = 0.50, linetype = "dashed")
+  geom_hline(yintercept = 0.50, linetype = "dashed") + theme(legend.position="none")
 
 ### Selected variables
-selectedVars <- do.call(rbind, result$vars) %>% ungroup %>% 
+selectedVarsDat <- do.call(rbind, result$vars) %>% ungroup %>% 
     mutate(Classifier = factor(Classifier, 
     levels = c("Concatenation", "DIABLO_null", "DIABLO_full", "Ensemble"))) %>% 
   group_by(Classifier, FC, Noise, varType) %>% 
   summarise(Mean = mean(n), SD = sd(n)) %>% 
   ungroup %>% 
-    mutate(FC = gsub("FC_", "FC=", FC), Noise = gsub("Noise_", "Noise=", Noise)) %>% 
+    mutate(FC = gsub("FC_", "FC=", FC), Noise = gsub("Noise_", "Noise=", Noise))
+selectedVars <- selectedVarsDat %>% 
   ggplot(aes(x = Classifier, y = Mean, color = varType, fill = varType)) +
   geom_bar(stat = "identity") + 
   #geom_errorbar(aes(ymin = Mean, ymax = Mean+SD), position="dodge") +
@@ -186,12 +185,45 @@ selectedVars <- do.call(rbind, result$vars) %>% ungroup %>%
               xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) +
   ylab("Average number of selected variables \n across 3 datasets over 20 simulations") +
   geom_hline(yintercept = 180, linetype = "dashed") + xlab("Integrative Classifiers") +
-  scale_y_continuous(breaks=c(60,120,180))
+  scale_y_continuous(breaks=c(60,120,180)) + theme(legend.position="top")
 
-plot_grid(errorRates, selectedVars, labels = c("", ""), label_size = 30)
+plot_grid(errorRates, selectedVars, labels = c("A", "B"), label_size = 30)
 ```
 
 > The covariance between datasets was held constant at 1, whereas the fold-change was varied from 0-2, and noise was varied from 0.2-1. As expected the error rate was roughly 50% when the fold-change was zero, regardless of noise level for all methods. When the fold-change was set to 1, the DIABLO model the full design (DIABLO_full) had a higher error rate as compared to the other methods, for noise levels less than 1. However, when the noise level was increased to match the level of the fold-change all methods performed similarly. When the fold-change was increased to 2 (higher than both the covariance and noise levels) the DIABLO_full model performed similarly with the other methods.
+
+```{r simulationResults_mainText, fig.path='Figures/', dev='png', fig.height = 7, fig.width = 16.5}
+## error rates
+errorRates <- errorRatesDat %>% 
+  filter(FC != "FC=0") %>% 
+  ggplot(aes(x = Classifier, y = error, fill=Noise)) +
+  geom_boxplot() +
+  scale_fill_manual(values=c("#F0F0F0", "#BDBDBD", "#737373")) + 
+  facet_grid(FC ~ Noise, scales = "free") +
+  customTheme(sizeStripFont = 20, xAngle = -45, hjust = 0, vjust = 1,
+              xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) +
+  ylab("Mean±SD of error rate \n 10-fold cross-validation over 20 simulations") +
+  xlab("Integrative Classifiers") +
+  geom_hline(yintercept = 0.50, linetype = "dashed") +
+  theme(legend.position = "none")
+
+## selected variables
+selectedVars <- selectedVarsDat %>% 
+  filter(FC != "FC=0") %>% 
+  ggplot(aes(x = Classifier, y = Mean, color = varType, fill = varType)) +
+  geom_bar(stat = "identity") + 
+  #geom_errorbar(aes(ymin = Mean, ymax = Mean+SD), position="dodge") +
+  facet_grid(FC ~ Noise) +
+  customTheme(sizeStripFont = 20, xAngle = -45, hjust = 0, vjust = 1, 
+              xSize = 15, ySize = 15, xAxisSize = 15, yAxisSize = 15) +
+  ylab("Average number of selected variables \n across 3 datasets over 20 simulations") +
+  geom_hline(yintercept = 180, linetype = "dashed") + xlab("Integrative Classifiers") +
+  scale_y_continuous(breaks=c(60,120,180)) + theme(legend.position="top")
+
+plot_grid(errorRates, selectedVars, labels = c("A", "B"), label_size = 30)
+```
+
+
 
 # Trade-off between correlation and discrimination
 
@@ -567,6 +599,40 @@ nVars %>%
 ```
 
 > when additional independent information is added in the DIABLO (full design) model by retaining additional components (but retaining the number of variables), the error rate significantly improves and becomes more similar to that of the DIABLO (null design) model.
+
+## Classification occurs individually in each dataset
+
+### associating component 1 of different data-types
+
+```{javascript}
+J <- 3; fc = 2; noise = 0.5; n=100; p_relevant=30; p_irrelevant=100; ncomp = 1;
+
+genDats <- simData(fc=fc, noise=noise, J, n, p_relevant, p_irrelevant, cov=1)
+data <- genDats$data
+Y <- genDats$Y
+
+design <- matrix(1, nrow = J, ncol = J)
+diag(design) <- 0
+keepX = list(rep(2*p_relevant, ncomp), rep(2*p_relevant, ncomp), rep(2*p_relevant, ncomp))
+rownames(design) <- colnames(design) <- names(keepX) <- names(data)
+result.full = block.splsda(X = data, Y = Y, ncomp = ncomp, keepX = keepX, design = design)
+
+comp1 = do.call(cbind, result.full$variates[1:3])
+colnames(comp1) = paste(paste0("Dataset", 1:3), rep("comp1", 3), sep="_")
+pairs(comp1, col = color.mixo(as.numeric(factor(Y))), pch = 19)
+```
+
+### association between all components from all datasets
+
+```{r}
+ncomp <- 2
+result.full = block.splsda(X = data, Y = Y, ncomp = ncomp, keepX = keepX, design = design)
+
+comp2 = do.call(cbind, result.full$variates[1:3])
+colnames(comp2) = paste(rep(paste0("Dataset", 1:3), e=2), rep(c("comp1", "comp2"), 3), sep="_")
+pairs(comp2, col = color.mixo(as.numeric(factor(Y))), pch = 19)
+```
+
 
 # Conclusion
 
